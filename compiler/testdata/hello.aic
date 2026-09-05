@@ -1,0 +1,11 @@
+aic_version 0.1
+app "AIC Hello" package "dev.aic.generated.hello" {
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let message = android.text_view(text: "Hello from AndroidIntelligentCompiler")
+      android.add_view(parent: root, child: message)
+      android.set_content_view(root)
+    }
+  }
+}

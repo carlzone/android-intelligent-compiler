@@ -1,0 +1,24 @@
+name: M1 compiler path
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify-compiler:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: compiler
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - run: cargo fmt --all --check
+      - run: cargo test --workspace
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo run -p aic-cli -- compile --input testdata/hello.aic --output-dir /tmp/aic-m1-first --profile android-35
+      - run: cargo run -p aic-cli -- compile --input testdata/hello.aic --output-dir /tmp/aic-m1-second --profile android-35
+      - run: cmp /tmp/aic-m1-first/classes.dex /tmp/aic-m1-second/classes.dex
+      - run: cmp /tmp/aic-m1-first/AndroidManifest.xml /tmp/aic-m1-second/AndroidManifest.xml

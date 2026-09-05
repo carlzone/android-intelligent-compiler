@@ -1,0 +1,12 @@
+[package]
+name = "aic-dex"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aic-ir = { path = "../aic-ir" }
+
+[lints]
+workspace = true
+
