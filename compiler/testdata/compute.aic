@@ -1,0 +1,23 @@
+aic_version 0.1
+app "AIC Compute" package "dev.aic.generated.compute" {
+  fn aggregate(limit: i32) -> i32 {
+    var total: i32 = 0
+    for i in 0..limit {
+      if i % 2 == 0 {
+        total = total + i
+      } else {
+        total = total + 1
+      }
+    }
+    return total
+  }
+  activity MainActivity {
+    on_create {
+      let result: i32 = aggregate(12)
+      let root = android.linear_layout(orientation: vertical)
+      let message = android.text_view(text: "Result: " + string(result))
+      android.add_view(parent: root, child: message)
+      android.set_content_view(root)
+    }
+  }
+}

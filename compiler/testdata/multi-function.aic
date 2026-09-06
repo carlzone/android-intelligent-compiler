@@ -1,0 +1,24 @@
+aic_version 0.1
+app "AIC Multi Function" package "dev.aic.generated.multifunction" {
+  fn add(left: i32, right: i32) -> i32 {
+    return left + right
+  }
+
+  fn twice(value: i32) -> i32 {
+    return value * 2
+  }
+
+  fn calculate(seed: i32) -> i32 {
+    return twice(add(seed, 4))
+  }
+
+  activity MainActivity {
+    on_create {
+      let answer: i32 = calculate(7)
+      let root = android.linear_layout(orientation: vertical)
+      let message = android.text_view(text: "Answer: " + string(answer))
+      android.add_view(parent: root, child: message)
+      android.set_content_view(root)
+    }
+  }
+}

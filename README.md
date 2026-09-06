@@ -24,3 +24,14 @@ M1 compiles `compiler/testdata/hello.aic` directly into a framework-Activity DEX
 ```
 
 The final command requires exactly one authorized physical ARM64 device. See `compiler/docs/m1-hello-apk.md` for the supported IR subset, artifacts, signing policy, and exit-gate evidence.
+
+## M3 Interactive UI
+
+M3 adds activity state, buttons, integer inputs, scroll/layout primitives, click handlers, and runtime UI updates. Counter and calculator fixtures can be built and tested from `compiler/`:
+
+```powershell
+./scripts/build-m3.ps1
+./scripts/device-smoke-m3.ps1 -SkipBuild
+```
+
+See `compiler/docs/m3-interactive-ui.md` for the IR contract and recreation policy.

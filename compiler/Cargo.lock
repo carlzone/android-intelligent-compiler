@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "aic-dex",
  "aic-ir",
+ "aic-opt",
 ]
 
 [[package]]
@@ -20,3 +21,10 @@ dependencies = [
 [[package]]
 name = "aic-ir"
 version = "0.1.0"
+
+[[package]]
+name = "aic-opt"
+version = "0.1.0"
+dependencies = [
+ "aic-ir",
+]

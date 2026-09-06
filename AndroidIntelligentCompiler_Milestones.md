@@ -108,6 +108,8 @@ Exit gate: A clean, documented run converts the fixture from AIC IR to a signed 
 
 ### M2 - Small Programming Core
 
+Status: **Complete (2026-09-06)**. Closure evidence is recorded in `compiler/docs/m2-acceptance-evidence.md`.
+
 Objective: Establish a typed semantic core large enough to compile non-trivial deterministic computations.
 
 Scope:
@@ -132,6 +134,8 @@ Acceptance criteria:
 Exit gate: The supported programming core passes semantic, lowering, and device/runtime tests for both valid and invalid fixtures.
 
 ### M3 - Interactive Android UI Primitives
+
+Status: **Complete (2026-09-06)**. Closure evidence is recorded in `compiler/docs/m3-acceptance-evidence.md`.
 
 Objective: Generate small interactive Android applications with deterministic UI and event behavior.
 

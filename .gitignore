@@ -16,6 +16,8 @@ target
 # AIC local keys and generated M1 artifacts
 compiler/.aic/
 compiler/testdata/generated/m1/
+compiler/testdata/generated/m2/
+compiler/testdata/generated/m3/
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

@@ -1,0 +1,46 @@
+name: M2 programming core
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify-m2:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: compiler
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - run: cargo fmt --all --check
+      - run: cargo test --workspace
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Compile valid corpus twice and compare deterministic DEX
+        run: |
+          for fixture in compute dynamic-string multi-function string-equality short-circuit; do
+            for level in 0 1; do
+              for run in a b; do
+                cargo run -p aic-cli -- compile \
+                  --input "testdata/$fixture.aic" \
+                  --output-dir "/tmp/$fixture-o$level-$run" \
+                  --profile android-35 \
+                  --opt-level "$level"
+              done
+              cmp "/tmp/$fixture-o$level-a/classes.dex" "/tmp/$fixture-o$level-b/classes.dex"
+            done
+          done
+      - name: Invalid corpus fails before DEX construction
+        run: |
+          check_invalid() {
+            fixture="$1"
+            code="$2"
+            output="$(cargo run -p aic-cli -- compile --input "$fixture" --output-dir /tmp/invalid --profile android-35 2>&1)" && exit 1
+            printf '%s\n' "$output" | grep "$code"
+            test ! -e /tmp/invalid/classes.dex
+          }
+          check_invalid testdata/invalid/m2-immutable-assignment.aic AIC1108
+          check_invalid testdata/invalid/m2-type-mismatch.aic AIC1116
+          check_invalid testdata/invalid/m2-recursion.aic AIC1119

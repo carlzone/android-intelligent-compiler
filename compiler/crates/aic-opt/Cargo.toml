@@ -1,13 +1,11 @@
 [package]
-name = "aic-cli"
+name = "aic-opt"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-aic-dex = { path = "../aic-dex" }
 aic-ir = { path = "../aic-ir" }
-aic-opt = { path = "../aic-opt" }
 
 [lints]
 workspace = true

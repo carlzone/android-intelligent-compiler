@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/aic-ir", "crates/aic-dex", "crates/aic-cli"]
+members = ["crates/aic-ir", "crates/aic-opt", "crates/aic-dex", "crates/aic-cli"]
 resolver = "2"
 
 [workspace.package]

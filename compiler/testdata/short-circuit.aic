@@ -1,0 +1,22 @@
+aic_version 0.1
+app "AIC Short Circuit" package "dev.aic.generated.shortcircuit" {
+  fn guarded_and(enabled: bool, divisor: i32) -> bool {
+    return enabled && 10 / divisor > 1
+  }
+
+  fn guarded_or(enabled: bool, divisor: i32) -> bool {
+    return enabled || 10 / divisor > 1
+  }
+
+  activity MainActivity {
+    on_create {
+      let left: bool = guarded_and(false, 0)
+      let right: bool = guarded_or(true, 0)
+      let rendered: string = "Short circuit: " + string(left) + "," + string(right)
+      let root = android.linear_layout(orientation: vertical)
+      let message = android.text_view(text: rendered)
+      android.add_view(parent: root, child: message)
+      android.set_content_view(root)
+    }
+  }
+}

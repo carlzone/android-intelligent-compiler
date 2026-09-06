@@ -1,0 +1,17 @@
+aic_version 0.1
+app "AIC Dynamic String" package "dev.aic.generated.dynamic" {
+  fn render(value: i32) -> string {
+    return "Value: " + string(value)
+  }
+
+  activity MainActivity {
+    on_create {
+      let number: i32 = 7
+      let caption: string = render(number)
+      let container = android.linear_layout(orientation: vertical)
+      let output = android.text_view(text: caption)
+      android.add_view(parent: container, child: output)
+      android.set_content_view(container)
+    }
+  }
+}

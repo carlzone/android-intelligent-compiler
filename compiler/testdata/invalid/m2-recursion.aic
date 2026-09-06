@@ -1,0 +1,14 @@
+aic_version 0.1
+app "Invalid Recursion" package "dev.aic.invalid.recursion" {
+  fn recurse(value: i32) -> i32 {
+    return recurse(value)
+  }
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let message = android.text_view(text: "invalid")
+      android.add_view(parent: root, child: message)
+      android.set_content_view(root)
+    }
+  }
+}

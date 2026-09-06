@@ -1,0 +1,22 @@
+aic_version 0.1
+app "AIC String Equality" package "dev.aic.generated.strings" {
+  fn same(left: string, right: string) -> bool {
+    return left == right
+  }
+
+  fn different(left: string, right: string) -> bool {
+    return left != right
+  }
+
+  activity MainActivity {
+    on_create {
+      let equal: bool = same("alpha", "alpha")
+      let unequal: bool = different("alpha", "beta")
+      let rendered: string = "Equal: " + string(equal) + ", different: " + string(unequal)
+      let root = android.linear_layout(orientation: vertical)
+      let message = android.text_view(text: rendered)
+      android.add_view(parent: root, child: message)
+      android.set_content_view(root)
+    }
+  }
+}

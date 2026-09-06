@@ -1,5 +1,6 @@
 use aic_dex::{encode_activity_dex, encode_minimal_dex};
 use aic_ir::{parse_program, MinimalClass, Program};
+use aic_opt::{optimize, CompilerOptions, OptimizationLevel};
 use std::{
     env,
     error::Error,
@@ -24,7 +25,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("emit-minimal") if args.len() == 1 => emit_minimal(),
         Some("compile") => compile(&args[1..]),
         Some("assemble-apk") => assemble(&args[1..]),
-        _ => Err("usage: aic-cli emit-minimal | compile --input <file> --output-dir <dir> --profile android-35 | assemble-apk --base <apk> --dex <dex> --output <apk>".into()),
+        _ => Err("usage: aic-cli emit-minimal | compile --input <file> --output-dir <dir> --profile android-35 [--opt-level 0|1] | assemble-apk --base <apk> --dex <dex> --output <apk>".into()),
     }
 }
 fn emit_minimal() -> Result<(), Box<dyn Error>> {
@@ -44,7 +45,16 @@ fn compile(args: &[OsString]) -> Result<(), Box<dyn Error>> {
     if profile != Path::new("android-35") {
         return Err("unsupported profile; expected android-35".into());
     }
-    let program = parse_program(&fs::read_to_string(input)?)?;
+    let level = optional(args, "--opt-level").unwrap_or_else(|| PathBuf::from("1"));
+    let optimization_level = match level.to_str() {
+        Some("0") => OptimizationLevel::None,
+        Some("1") => OptimizationLevel::Basic,
+        _ => return Err("unsupported optimization level; expected 0 or 1".into()),
+    };
+    let program = optimize(
+        parse_program(&fs::read_to_string(input)?)?,
+        CompilerOptions { optimization_level },
+    );
     fs::create_dir_all(&output)?;
     write_file(&output.join("classes.dex"), &encode_activity_dex(&program)?)?;
     write_file(
@@ -53,7 +63,11 @@ fn compile(args: &[OsString]) -> Result<(), Box<dyn Error>> {
     )?;
     write_file(
         &output.join("build-profile.txt"),
-        b"profile=android-35\ndex=035\nminSdk=23\ntargetSdk=35\n",
+        format!(
+            "profile=android-35\ndex=035\nminSdk=23\ntargetSdk=35\noptLevel={}\n",
+            i32::from(optimization_level != OptimizationLevel::None)
+        )
+        .as_bytes(),
     )?;
     println!("compiled {}", output.display());
     Ok(())
@@ -74,6 +88,12 @@ fn option(args: &[OsString], name: &str) -> Result<PathBuf, Box<dyn Error>> {
     args.get(at + 1)
         .map(PathBuf::from)
         .ok_or_else(|| format!("missing value for {name}").into())
+}
+fn optional(args: &[OsString], name: &str) -> Option<PathBuf> {
+    args.iter()
+        .position(|v| v == name)
+        .and_then(|at| args.get(at + 1))
+        .map(PathBuf::from)
 }
 fn write_file(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     if let Some(parent) = path.parent() {

@@ -1,7 +1,9 @@
 param(
     [string]$SdkRoot = $env:ANDROID_SDK_ROOT,
     [string]$Keystore,
-    [string]$OutputDir
+    [string]$OutputDir,
+    [string]$InputFile = 'testdata/hello.aic',
+    [ValidateSet(0, 1)][int]$OptLevel = 1
 )
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $PSScriptRoot
@@ -26,7 +28,7 @@ function Invoke-AicTool([string]$Display, [string]$File, [string[]]$Arguments) {
 }
 Push-Location $workspace
 try {
-    Invoke-AicTool 'cargo run -p aic-cli -- compile --input testdata/hello.aic --output-dir testdata/generated/m1 --profile android-35' $cargoPath @('run','-p','aic-cli','--','compile','--input','testdata/hello.aic','--output-dir',$OutputDir,'--profile','android-35')
+    Invoke-AicTool "cargo run -p aic-cli -- compile --input $InputFile --output-dir [output] --profile android-35 --opt-level $OptLevel" $cargoPath @('run','-p','aic-cli','--','compile','--input',$InputFile,'--output-dir',$OutputDir,'--profile','android-35','--opt-level',"$OptLevel")
     $manifest = Join-Path $OutputDir 'AndroidManifest.xml'; $dex = Join-Path $OutputDir 'classes.dex'; $base = Join-Path $OutputDir 'base.apk'; $unaligned = Join-Path $OutputDir 'hello-unaligned.apk'; $aligned = Join-Path $OutputDir 'hello-aligned.apk'; $signed = Join-Path $OutputDir 'hello-signed.apk'
     Invoke-AicTool 'aapt2 link --manifest AndroidManifest.xml -I android-35/android.jar -o base.apk' $aapt2 @('link','--manifest',$manifest,'-I',$androidJar,'-o',$base)
     Invoke-AicTool 'cargo run -p aic-cli -- assemble-apk --base base.apk --dex classes.dex --output hello-unaligned.apk' $cargoPath @('run','-p','aic-cli','--','assemble-apk','--base',$base,'--dex',$dex,'--output',$unaligned)

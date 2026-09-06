@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use aic_ir::{Operation, Program};
+use aic_ir::{
+    Expression, ExpressionKind, Function, Program, Statement, StatementKind, Type, Value,
+};
 
 use crate::{
     encoding::{encode_mutf8, encode_uleb128, ByteWriter, DexError},
@@ -18,8 +20,14 @@ struct Proto {
 #[derive(Clone, Debug)]
 struct Method {
     class: String,
-    name: &'static str,
+    name: String,
     proto: Proto,
+}
+#[derive(Clone, Debug)]
+struct Field {
+    class: String,
+    name: String,
+    ty: String,
 }
 #[derive(Clone, Copy)]
 struct Section {
@@ -34,13 +42,18 @@ struct Pool {
     types: Vec<u32>,
     type_index: BTreeMap<String, u16>,
     protos: Vec<Proto>,
+    fields: Vec<Field>,
     methods: Vec<Method>,
 }
 
 impl Pool {
     #[allow(clippy::too_many_lines)]
-    fn build(class: &str, text: &str) -> Result<Self, DexError> {
-        let protos = vec![
+    fn build(class: &str, program: &Program) -> Result<Self, DexError> {
+        let functions = &program.functions;
+        let runtime = !functions.is_empty()
+            || !program.activity.state.is_empty()
+            || !program.activity.on_click.is_empty();
+        let mut protos = vec![
             Proto {
                 ret: "V",
                 params: vec![],
@@ -65,61 +78,301 @@ impl Pool {
                 ret: "V",
                 params: vec!["Landroid/view/View;"],
             },
+            Proto {
+                ret: "V",
+                params: vec!["Landroid/view/View$OnClickListener;"],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["I", "I", "F"],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["Landroid/view/ViewGroup$LayoutParams;"],
+            },
+            Proto {
+                ret: "I",
+                params: vec!["Ljava/lang/String;"],
+            },
         ];
-        let methods = vec![
+        if runtime {
+            protos.extend([
+                Proto {
+                    ret: "I",
+                    params: vec!["I"],
+                },
+                Proto {
+                    ret: "Ljava/lang/String;",
+                    params: vec!["I"],
+                },
+                Proto {
+                    ret: "Ljava/lang/StringBuilder;",
+                    params: vec!["Ljava/lang/String;"],
+                },
+                Proto {
+                    ret: "Ljava/lang/StringBuilder;",
+                    params: vec!["I"],
+                },
+                Proto {
+                    ret: "Ljava/lang/String;",
+                    params: vec![],
+                },
+                Proto {
+                    ret: "Z",
+                    params: vec!["Ljava/lang/Object;"],
+                },
+                Proto {
+                    ret: "Ljava/lang/String;",
+                    params: vec!["Z"],
+                },
+                Proto {
+                    ret: "Ljava/lang/CharSequence;",
+                    params: vec![],
+                },
+                Proto {
+                    ret: "Z",
+                    params: vec!["Ljava/lang/String;"],
+                },
+                Proto {
+                    ret: "I",
+                    params: vec!["Ljava/lang/String;"],
+                },
+            ]);
+            protos.extend(functions.iter().map(function_proto));
+        }
+        let mut fields = Vec::new();
+        for state in &program.activity.state {
+            fields.push(Field {
+                class: class.into(),
+                name: state.name.clone(),
+                ty: type_descriptor(state.ty).into(),
+            });
+        }
+        for statement in &program.activity.on_create {
+            if let Some((id, ty)) = view_field(statement) {
+                fields.push(Field {
+                    class: class.into(),
+                    name: format!("view${id}"),
+                    ty: ty.into(),
+                });
+            }
+        }
+        let interactive = !program.activity.on_click.is_empty();
+        let mut methods = vec![
             Method {
                 class: class.to_owned(),
-                name: "<init>",
+                name: "<init>".into(),
                 proto: protos[0].clone(),
             },
             Method {
                 class: class.to_owned(),
-                name: "onCreate",
+                name: "onCreate".into(),
                 proto: protos[1].clone(),
             },
             Method {
                 class: "Landroid/app/Activity;".into(),
-                name: "<init>",
+                name: "<init>".into(),
                 proto: protos[0].clone(),
             },
             Method {
                 class: "Landroid/app/Activity;".into(),
-                name: "onCreate",
+                name: "onCreate".into(),
                 proto: protos[1].clone(),
             },
             Method {
                 class: "Landroid/app/Activity;".into(),
-                name: "setContentView",
+                name: "setContentView".into(),
                 proto: protos[5].clone(),
             },
             Method {
                 class: "Landroid/widget/LinearLayout;".into(),
-                name: "<init>",
+                name: "<init>".into(),
                 proto: protos[2].clone(),
             },
             Method {
                 class: "Landroid/widget/LinearLayout;".into(),
-                name: "setOrientation",
+                name: "setOrientation".into(),
                 proto: protos[3].clone(),
             },
             Method {
                 class: "Landroid/widget/TextView;".into(),
-                name: "<init>",
+                name: "<init>".into(),
                 proto: protos[2].clone(),
             },
             Method {
                 class: "Landroid/widget/TextView;".into(),
-                name: "setText",
+                name: "setText".into(),
                 proto: protos[4].clone(),
             },
             Method {
+                class: "Landroid/widget/Button;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/EditText;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/TextView;".into(),
+                name: "setHint".into(),
+                proto: protos[4].clone(),
+            },
+            Method {
+                class: "Landroid/widget/TextView;".into(),
+                name: "setInputType".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/widget/ScrollView;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setOnClickListener".into(),
+                proto: protos[6].clone(),
+            },
+            Method {
+                class: "Landroid/widget/LinearLayout$LayoutParams;".into(),
+                name: "<init>".into(),
+                proto: protos[7].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setLayoutParams".into(),
+                proto: protos[8].clone(),
+            },
+            Method {
+                class: "Landroid/graphics/Color;".into(),
+                name: "parseColor".into(),
+                proto: Proto {
+                    ret: "I",
+                    params: vec!["Ljava/lang/String;"],
+                },
+            },
+            Method {
+                class: "Landroid/widget/TextView;".into(),
+                name: "setTextColor".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setBackgroundColor".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
                 class: "Landroid/view/ViewGroup;".into(),
-                name: "addView",
+                name: "addView".into(),
                 proto: protos[5].clone(),
             },
         ];
+        if interactive {
+            methods.push(Method {
+                class: class.into(),
+                name: "onClick".into(),
+                proto: protos[5].clone(),
+            });
+        }
+        if runtime {
+            methods.extend(functions.iter().map(|function| Method {
+                class: class.into(),
+                name: function.name.clone(),
+                proto: function_proto(function),
+            }));
+            methods.extend([
+                Method {
+                    class: "Ljava/lang/String;".into(),
+                    name: "valueOf".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/String;",
+                        params: vec!["I"],
+                    },
+                },
+                Method {
+                    class: "Landroid/widget/TextView;".into(),
+                    name: "getText".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/CharSequence;",
+                        params: vec![],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/Object;".into(),
+                    name: "toString".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/String;",
+                        params: vec![],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/String;".into(),
+                    name: "matches".into(),
+                    proto: Proto {
+                        ret: "Z",
+                        params: vec!["Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/Integer;".into(),
+                    name: "parseInt".into(),
+                    proto: Proto {
+                        ret: "I",
+                        params: vec!["Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/String;".into(),
+                    name: "valueOf".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/String;",
+                        params: vec!["Z"],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/String;".into(),
+                    name: "equals".into(),
+                    proto: Proto {
+                        ret: "Z",
+                        params: vec!["Ljava/lang/Object;"],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/StringBuilder;".into(),
+                    name: "<init>".into(),
+                    proto: Proto {
+                        ret: "V",
+                        params: vec![],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/StringBuilder;".into(),
+                    name: "append".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/StringBuilder;",
+                        params: vec!["Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/StringBuilder;".into(),
+                    name: "append".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/StringBuilder;",
+                        params: vec!["I"],
+                    },
+                },
+                Method {
+                    class: "Ljava/lang/StringBuilder;".into(),
+                    name: "toString".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/String;",
+                        params: vec![],
+                    },
+                },
+            ]);
+        }
         let mut strings = BTreeSet::new();
-        strings.insert(text.to_owned());
         for value in [
             class,
             "Landroid/app/Activity;",
@@ -127,20 +380,59 @@ impl Pool {
             "Landroid/os/Bundle;",
             "Landroid/view/View;",
             "Landroid/view/ViewGroup;",
+            "Landroid/view/View$OnClickListener;",
+            "Landroid/view/ViewGroup$LayoutParams;",
+            "Landroid/widget/LinearLayout$LayoutParams;",
+            "Landroid/graphics/Color;",
             "Landroid/widget/LinearLayout;",
             "Landroid/widget/TextView;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/EditText;",
+            "Landroid/widget/ScrollView;",
             "Ljava/lang/CharSequence;",
+            "Ljava/lang/String;",
             "I",
             "V",
+            "Z",
             "<init>",
             "onCreate",
             "setContentView",
             "setOrientation",
             "setText",
+            "setHint",
+            "setInputType",
             "addView",
+            "onClick",
+            "setOnClickListener",
+            "setLayoutParams",
+            "parseColor",
+            "setTextColor",
+            "setBackgroundColor",
+            "F",
         ] {
             strings.insert(value.to_owned());
         }
+        if runtime {
+            for value in [
+                "Ljava/lang/Object;",
+                "Ljava/lang/String;",
+                "Ljava/lang/StringBuilder;",
+                "Ljava/lang/Integer;",
+                "append",
+                "equals",
+                "toString",
+                "valueOf",
+                "getText",
+                "matches",
+                "parseInt",
+                crate::lower::VALID_I32_PATTERN,
+            ] {
+                strings.insert(value.into());
+            }
+            strings.extend(functions.iter().map(|function| function.name.clone()));
+        }
+        collect_program_strings(program, &mut strings);
+        strings.extend(fields.iter().map(|field| field.name.clone()));
         for proto in &protos {
             strings.insert(shorty(proto));
         }
@@ -164,6 +456,10 @@ impl Pool {
                 descriptors.insert((*p).into());
             }
         }
+        for field in &fields {
+            descriptors.insert(field.class.clone());
+            descriptors.insert(field.ty.clone());
+        }
         let mut types: Vec<u32> = descriptors.iter().map(|d| string_index[d]).collect();
         types.sort_unstable();
         let type_index: BTreeMap<String, u16> = types
@@ -177,7 +473,6 @@ impl Pool {
                 ))
             })
             .collect::<Result<_, DexError>>()?;
-        let mut protos = protos;
         protos.sort_by_key(|p| {
             (
                 type_index[p.ret],
@@ -191,12 +486,18 @@ impl Pool {
                 .position(|candidate| candidate == p)
                 .ok_or(DexError::InvalidInput("missing prototype"))
         };
-        let mut methods = methods;
         methods.sort_by_key(|m| {
             (
                 type_index[&m.class],
-                string_index[m.name],
+                string_index[&m.name],
                 proto_index(&m.proto).unwrap(),
+            )
+        });
+        fields.sort_by_key(|f| {
+            (
+                type_index[&f.class],
+                string_index[&f.name],
+                type_index[&f.ty],
             )
         });
         Ok(Self {
@@ -205,8 +506,16 @@ impl Pool {
             types,
             type_index,
             protos,
+            fields,
             methods,
         })
+    }
+    fn field(&self, class: &str, name: &str) -> Result<u16, DexError> {
+        self.fields
+            .iter()
+            .position(|f| f.class == class && f.name == name)
+            .ok_or(DexError::InvalidInput("missing field"))
+            .and_then(|i| u16::try_from(i).map_err(|_| DexError::IndexOverflow("field")))
     }
     fn method(&self, class: &str, name: &str, proto: &Proto) -> Result<u16, DexError> {
         self.methods
@@ -221,6 +530,125 @@ impl Pool {
             .position(|p| p == proto)
             .ok_or(DexError::InvalidInput("missing prototype"))
             .and_then(|i| u16::try_from(i).map_err(|_| DexError::IndexOverflow("prototype")))
+    }
+}
+fn type_descriptor(ty: Type) -> &'static str {
+    match ty {
+        Type::I32 => "I",
+        Type::Bool => "Z",
+        Type::String => "Ljava/lang/String;",
+    }
+}
+fn view_id(statement: &Statement) -> Option<&str> {
+    match &statement.kind {
+        StatementKind::LinearLayout { id, .. }
+        | StatementKind::TextView { id, .. }
+        | StatementKind::Button { id, .. }
+        | StatementKind::EditText { id, .. }
+        | StatementKind::ScrollView { id } => Some(id),
+        _ => None,
+    }
+}
+fn view_field(statement: &Statement) -> Option<(&str, &'static str)> {
+    match &statement.kind {
+        StatementKind::LinearLayout { id, .. } => Some((id, "Landroid/widget/LinearLayout;")),
+        StatementKind::TextView { id, .. } => Some((id, "Landroid/widget/TextView;")),
+        StatementKind::Button { id, .. } => Some((id, "Landroid/widget/Button;")),
+        StatementKind::EditText { id, .. } => Some((id, "Landroid/widget/EditText;")),
+        StatementKind::ScrollView { id } => Some((id, "Landroid/widget/ScrollView;")),
+        _ => None,
+    }
+}
+
+fn collect_program_strings(program: &Program, strings: &mut BTreeSet<String>) {
+    for function in &program.functions {
+        collect_statement_strings(&function.body, strings);
+    }
+    collect_statement_strings(&program.activity.on_create, strings);
+    for handler in &program.activity.on_click {
+        collect_statement_strings(&handler.body, strings);
+    }
+    for state in &program.activity.state {
+        collect_expression_strings(&state.initial, strings);
+    }
+}
+
+fn collect_statement_strings(statements: &[Statement], strings: &mut BTreeSet<String>) {
+    for statement in statements {
+        match &statement.kind {
+            StatementKind::Declare { value, .. }
+            | StatementKind::Assign { value, .. }
+            | StatementKind::Return(value)
+            | StatementKind::TextView { text: value, .. }
+            | StatementKind::Button { text: value, .. }
+            | StatementKind::EditText { hint: value, .. }
+            | StatementKind::SetText { text: value, .. } => {
+                collect_expression_strings(value, strings);
+            }
+            StatementKind::SetTextColor { color, .. }
+            | StatementKind::SetBackgroundColor { color, .. } => {
+                strings.insert(color.clone());
+            }
+            StatementKind::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                collect_expression_strings(condition, strings);
+                collect_statement_strings(then_body, strings);
+                collect_statement_strings(else_body, strings);
+            }
+            StatementKind::For {
+                start, end, body, ..
+            } => {
+                collect_expression_strings(start, strings);
+                collect_expression_strings(end, strings);
+                collect_statement_strings(body, strings);
+            }
+            StatementKind::LinearLayout { .. }
+            | StatementKind::ScrollView { .. }
+            | StatementKind::AddView { .. }
+            | StatementKind::SetContentView { .. }
+            | StatementKind::SetLayout { .. } => {}
+        }
+    }
+}
+
+fn collect_expression_strings(expression: &Expression, strings: &mut BTreeSet<String>) {
+    match &expression.kind {
+        ExpressionKind::Literal(Value::String(value)) => {
+            strings.insert(value.clone());
+        }
+        ExpressionKind::Unary { value, .. } => collect_expression_strings(value, strings),
+        ExpressionKind::Binary { left, right, .. } => {
+            collect_expression_strings(left, strings);
+            collect_expression_strings(right, strings);
+        }
+        ExpressionKind::Call { args, .. } => {
+            for argument in args {
+                collect_expression_strings(argument, strings);
+            }
+        }
+        ExpressionKind::AndroidText { .. }
+        | ExpressionKind::Literal(_)
+        | ExpressionKind::Name(_) => {}
+    }
+}
+
+fn descriptor(ty: Type) -> &'static str {
+    match ty {
+        Type::I32 | Type::Bool => "I",
+        Type::String => "Ljava/lang/String;",
+    }
+}
+fn function_proto(function: &Function) -> Proto {
+    Proto {
+        ret: descriptor(function.return_type),
+        params: function
+            .params
+            .iter()
+            .map(|parameter| descriptor(parameter.ty))
+            .collect(),
     }
 }
 
@@ -254,30 +682,21 @@ fn align4(value: u32) -> Result<u32, DexError> {
 /// Returns a typed DEX error if the program is outside the M1 lowering shape or
 /// if any index, offset, or encoded size cannot be represented safely.
 pub fn encode_activity_dex(program: &Program) -> Result<Vec<u8>, DexError> {
-    let text =
-        match program.activity.on_create.as_slice() {
-            [Operation::LinearLayout { id: root, .. }, Operation::TextView {
-                id: message, text, ..
-            }, Operation::AddView { parent, child, .. }, Operation::SetContentView { view, .. }]
-                if parent == root && child == message && view == root =>
-            {
-                text
-            }
-            _ => return Err(DexError::InvalidInput(
-                "M1 lowering requires linear layout, text view, add_view, then set_content_view",
-            )),
-        };
     let class = format!(
         "L{}/{};",
         program.package.replace('.', "/"),
         program.activity.name
     );
-    let pool = Pool::build(&class, text)?;
-    encode(&pool, &class, text)
+    let pool = Pool::build(&class, program)?;
+    encode(&pool, &class, program)
 }
 
 #[allow(clippy::too_many_lines)]
-fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
+fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexError> {
+    let functions = &program.functions;
+    let runtime = !functions.is_empty()
+        || !program.activity.state.is_empty()
+        || !program.activity.on_click.is_empty();
     let p0 = Proto {
         ret: "V",
         params: vec![],
@@ -302,6 +721,26 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
         ret: "V",
         params: vec!["Landroid/view/View;"],
     };
+    let pss = Proto {
+        ret: "Ljava/lang/StringBuilder;",
+        params: vec!["Ljava/lang/String;"],
+    };
+    let pstring = Proto {
+        ret: "Ljava/lang/String;",
+        params: vec![],
+    };
+    let p_string_i = Proto {
+        ret: "Ljava/lang/String;",
+        params: vec!["I"],
+    };
+    let p_equals = Proto {
+        ret: "Z",
+        params: vec!["Ljava/lang/Object;"],
+    };
+    let p_string_bool = Proto {
+        ret: "Ljava/lang/String;",
+        params: vec!["Z"],
+    };
     let own_init = pool.method(class, "<init>", &p0)?;
     let own_create = pool.method(class, "onCreate", &pb)?;
     let ctor = vec![
@@ -310,42 +749,273 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
         0,
         0x000e,
     ];
-    let create = vec![
-        0x206f,
-        pool.method("Landroid/app/Activity;", "onCreate", &pb)?,
-        0x0043,
-        0x0022,
-        pool.type_index["Landroid/widget/LinearLayout;"],
-        0x2070,
-        pool.method("Landroid/widget/LinearLayout;", "<init>", &pc)?,
-        0x0030,
-        0x1112,
-        0x206e,
-        pool.method("Landroid/widget/LinearLayout;", "setOrientation", &pi)?,
-        0x0010,
-        0x0122,
-        pool.type_index["Landroid/widget/TextView;"],
-        0x2070,
-        pool.method("Landroid/widget/TextView;", "<init>", &pc)?,
-        0x0031,
-        0x021a,
-        u16::try_from(pool.string_index[text]).map_err(|_| DexError::IndexOverflow("string"))?,
-        0x206e,
-        pool.method("Landroid/widget/TextView;", "setText", &ps)?,
-        0x0021,
-        0x206e,
-        pool.method("Landroid/view/ViewGroup;", "addView", &pv)?,
-        0x0010,
-        0x206e,
-        pool.method("Landroid/app/Activity;", "setContentView", &pv)?,
-        0x0003,
-        0x000e,
-    ];
+    let string_lowering = if runtime {
+        Some(crate::StringLowering {
+            value_of_i32: pool.method("Ljava/lang/String;", "valueOf", &p_string_i)?,
+            value_of_bool: pool.method("Ljava/lang/String;", "valueOf", &p_string_bool)?,
+            builder_type: pool.type_index["Ljava/lang/StringBuilder;"],
+            builder_init: pool.method("Ljava/lang/StringBuilder;", "<init>", &p0)?,
+            builder_append: pool.method("Ljava/lang/StringBuilder;", "append", &pss)?,
+            builder_to_string: pool.method("Ljava/lang/StringBuilder;", "toString", &pstring)?,
+            equals: pool.method("Ljava/lang/String;", "equals", &p_equals)?,
+            text_view_get_text: pool.method(
+                "Landroid/widget/TextView;",
+                "getText",
+                &Proto {
+                    ret: "Ljava/lang/CharSequence;",
+                    params: vec![],
+                },
+            )?,
+            object_to_string: pool.method("Ljava/lang/Object;", "toString", &pstring)?,
+            string_matches: pool.method(
+                "Ljava/lang/String;",
+                "matches",
+                &Proto {
+                    ret: "Z",
+                    params: vec!["Ljava/lang/String;"],
+                },
+            )?,
+            integer_parse_int: pool.method(
+                "Ljava/lang/Integer;",
+                "parseInt",
+                &Proto {
+                    ret: "I",
+                    params: vec!["Ljava/lang/String;"],
+                },
+            )?,
+        })
+    } else {
+        None
+    };
+    let lowered = functions
+        .iter()
+        .map(|function| {
+            crate::lower_function_typed(
+                function,
+                &|name| {
+                    let target = functions
+                        .iter()
+                        .find(|candidate| candidate.name == name)
+                        .ok_or(DexError::InvalidInput("unresolved lowered function"))?;
+                    Ok(crate::FunctionTarget {
+                        method: pool.method(class, name, &function_proto(target))?,
+                        params: target.params.iter().map(|parameter| parameter.ty).collect(),
+                        result: target.return_type,
+                    })
+                },
+                &|value| {
+                    u16::try_from(pool.string_index[value])
+                        .map_err(|_| DexError::IndexOverflow("string"))
+                },
+                string_lowering.ok_or(DexError::InvalidInput("missing runtime string methods"))?,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let resolve_target = |name: &str| {
+        let target = functions
+            .iter()
+            .find(|candidate| candidate.name == name)
+            .ok_or(DexError::InvalidInput("unresolved lowered function"))?;
+        Ok(crate::FunctionTarget {
+            method: pool.method(class, name, &function_proto(target))?,
+            params: target.params.iter().map(|parameter| parameter.ty).collect(),
+            result: target.return_type,
+        })
+    };
+    let resolve_string = |value: &str| {
+        pool.string_index
+            .get(value)
+            .copied()
+            .ok_or(DexError::InvalidInput("missing collected string literal"))
+            .and_then(|index| u16::try_from(index).map_err(|_| DexError::IndexOverflow("string")))
+    };
+    let create = crate::lower_on_create(
+        &program.activity.on_create,
+        &resolve_target,
+        &resolve_string,
+        string_lowering,
+        crate::UiLowering {
+            activity_on_create: pool.method("Landroid/app/Activity;", "onCreate", &pb)?,
+            linear_layout_type: pool.type_index["Landroid/widget/LinearLayout;"],
+            linear_layout_init: pool.method("Landroid/widget/LinearLayout;", "<init>", &pc)?,
+            linear_layout_orientation: pool.method(
+                "Landroid/widget/LinearLayout;",
+                "setOrientation",
+                &pi,
+            )?,
+            text_view_type: pool.type_index["Landroid/widget/TextView;"],
+            text_view_init: pool.method("Landroid/widget/TextView;", "<init>", &pc)?,
+            text_view_set_text: pool.method("Landroid/widget/TextView;", "setText", &ps)?,
+            button_type: pool.type_index["Landroid/widget/Button;"],
+            button_init: pool.method("Landroid/widget/Button;", "<init>", &pc)?,
+            edit_text_type: pool.type_index["Landroid/widget/EditText;"],
+            edit_text_init: pool.method("Landroid/widget/EditText;", "<init>", &pc)?,
+            edit_text_set_hint: pool.method("Landroid/widget/TextView;", "setHint", &ps)?,
+            edit_text_set_input_type: pool.method(
+                "Landroid/widget/TextView;",
+                "setInputType",
+                &pi,
+            )?,
+            scroll_view_type: pool.type_index["Landroid/widget/ScrollView;"],
+            scroll_view_init: pool.method("Landroid/widget/ScrollView;", "<init>", &pc)?,
+            set_on_click_listener: pool.method(
+                "Landroid/view/View;",
+                "setOnClickListener",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Landroid/view/View$OnClickListener;"],
+                },
+            )?,
+            layout_params_type: pool.type_index["Landroid/widget/LinearLayout$LayoutParams;"],
+            layout_params_init: pool.method(
+                "Landroid/widget/LinearLayout$LayoutParams;",
+                "<init>",
+                &Proto {
+                    ret: "V",
+                    params: vec!["I", "I", "F"],
+                },
+            )?,
+            set_layout_params: pool.method(
+                "Landroid/view/View;",
+                "setLayoutParams",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Landroid/view/ViewGroup$LayoutParams;"],
+                },
+            )?,
+            color_parse: pool.method(
+                "Landroid/graphics/Color;",
+                "parseColor",
+                &Proto {
+                    ret: "I",
+                    params: vec!["Ljava/lang/String;"],
+                },
+            )?,
+            set_text_color: pool.method("Landroid/widget/TextView;", "setTextColor", &pi)?,
+            set_background_color: pool.method("Landroid/view/View;", "setBackgroundColor", &pi)?,
+            add_view: pool.method("Landroid/view/ViewGroup;", "addView", &pv)?,
+            set_content_view: pool.method("Landroid/app/Activity;", "setContentView", &pv)?,
+        },
+        program
+            .activity
+            .state
+            .iter()
+            .map(|state| {
+                Ok((
+                    state.name.clone(),
+                    (pool.field(class, &state.name)?, state.ty),
+                ))
+            })
+            .collect::<Result<BTreeMap<_, _>, DexError>>()?,
+        program
+            .activity
+            .on_create
+            .iter()
+            .filter_map(|statement| view_id(statement).map(str::to_owned))
+            .map(|id| Ok((id.clone(), pool.field(class, &format!("view${id}"))?)))
+            .collect::<Result<BTreeMap<_, _>, DexError>>()?,
+        &program.activity.state,
+    )?;
+    let click = if program.activity.on_click.is_empty() {
+        None
+    } else {
+        Some(crate::lower_on_click(
+            &program.activity.on_click,
+            &resolve_target,
+            &resolve_string,
+            string_lowering,
+            crate::UiLowering {
+                activity_on_create: pool.method("Landroid/app/Activity;", "onCreate", &pb)?,
+                linear_layout_type: pool.type_index["Landroid/widget/LinearLayout;"],
+                linear_layout_init: pool.method("Landroid/widget/LinearLayout;", "<init>", &pc)?,
+                linear_layout_orientation: pool.method(
+                    "Landroid/widget/LinearLayout;",
+                    "setOrientation",
+                    &pi,
+                )?,
+                text_view_type: pool.type_index["Landroid/widget/TextView;"],
+                text_view_init: pool.method("Landroid/widget/TextView;", "<init>", &pc)?,
+                text_view_set_text: pool.method("Landroid/widget/TextView;", "setText", &ps)?,
+                button_type: pool.type_index["Landroid/widget/Button;"],
+                button_init: pool.method("Landroid/widget/Button;", "<init>", &pc)?,
+                edit_text_type: pool.type_index["Landroid/widget/EditText;"],
+                edit_text_init: pool.method("Landroid/widget/EditText;", "<init>", &pc)?,
+                edit_text_set_hint: pool.method("Landroid/widget/TextView;", "setHint", &ps)?,
+                edit_text_set_input_type: pool.method(
+                    "Landroid/widget/TextView;",
+                    "setInputType",
+                    &pi,
+                )?,
+                scroll_view_type: pool.type_index["Landroid/widget/ScrollView;"],
+                scroll_view_init: pool.method("Landroid/widget/ScrollView;", "<init>", &pc)?,
+                set_on_click_listener: pool.method(
+                    "Landroid/view/View;",
+                    "setOnClickListener",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Landroid/view/View$OnClickListener;"],
+                    },
+                )?,
+                layout_params_type: pool.type_index["Landroid/widget/LinearLayout$LayoutParams;"],
+                layout_params_init: pool.method(
+                    "Landroid/widget/LinearLayout$LayoutParams;",
+                    "<init>",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["I", "I", "F"],
+                    },
+                )?,
+                set_layout_params: pool.method(
+                    "Landroid/view/View;",
+                    "setLayoutParams",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Landroid/view/ViewGroup$LayoutParams;"],
+                    },
+                )?,
+                color_parse: pool.method(
+                    "Landroid/graphics/Color;",
+                    "parseColor",
+                    &Proto {
+                        ret: "I",
+                        params: vec!["Ljava/lang/String;"],
+                    },
+                )?,
+                set_text_color: pool.method("Landroid/widget/TextView;", "setTextColor", &pi)?,
+                set_background_color: pool.method(
+                    "Landroid/view/View;",
+                    "setBackgroundColor",
+                    &pi,
+                )?,
+                add_view: pool.method("Landroid/view/ViewGroup;", "addView", &pv)?,
+                set_content_view: pool.method("Landroid/app/Activity;", "setContentView", &pv)?,
+            },
+            program
+                .activity
+                .state
+                .iter()
+                .map(|state| {
+                    Ok((
+                        state.name.clone(),
+                        (pool.field(class, &state.name)?, state.ty),
+                    ))
+                })
+                .collect::<Result<BTreeMap<_, _>, DexError>>()?,
+            program
+                .activity
+                .on_create
+                .iter()
+                .filter_map(|statement| view_id(statement).map(str::to_owned))
+                .map(|id| Ok((id.clone(), pool.field(class, &format!("view${id}"))?)))
+                .collect::<Result<BTreeMap<_, _>, DexError>>()?,
+        )?)
+    };
 
     let string_ids = HEADER_SIZE;
     let type_ids = string_ids + u32_len(pool.strings.len())? * 4;
     let proto_ids = type_ids + u32_len(pool.types.len())? * 4;
-    let method_ids = proto_ids + u32_len(pool.protos.len())? * 12;
+    let field_ids = proto_ids + u32_len(pool.protos.len())? * 12;
+    let method_ids = field_ids + u32_len(pool.fields.len())? * 8;
     let class_defs = method_ids + u32_len(pool.methods.len())? * 8;
     let data = class_defs + 32;
     let mut cursor = data;
@@ -361,6 +1031,14 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
             type_lists.push((proto.clone(), off));
         }
     }
+    let interfaces_off = if program.activity.on_click.is_empty() {
+        0
+    } else {
+        cursor = align4(cursor)?;
+        let offset = cursor;
+        cursor += 8;
+        offset
+    };
     let string_data = cursor;
     let mut string_offsets = Vec::new();
     for value in &pool.strings {
@@ -375,13 +1053,47 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
     cursor += 16 + u32_len(ctor.len())? * 2;
     cursor = align4(cursor)?;
     let create_code = cursor;
-    cursor += 16 + u32_len(create.len())? * 2;
+    cursor += 16 + u32_len(create.code.len())? * 2;
+    let click_code = if let Some(method) = &click {
+        cursor = align4(cursor)?;
+        let offset = cursor;
+        cursor += 16 + u32_len(method.code.len())? * 2;
+        Some(offset)
+    } else {
+        None
+    };
+    let mut function_code_offsets = Vec::new();
+    for method in &lowered {
+        cursor = align4(cursor)?;
+        function_code_offsets.push(cursor);
+        cursor += 16 + u32_len(method.code.len())? * 2;
+    }
     let class_data = cursor;
-    let class_data_bytes = class_data_item(own_init, ctor_code, own_create, create_code);
+    let class_data_bytes = class_data_item(
+        &(0..pool.fields.len())
+            .map(|index| u16::try_from(index).unwrap())
+            .collect::<Vec<_>>(),
+        own_init,
+        ctor_code,
+        own_create,
+        create_code,
+        click_code.map(|offset| (pool.method(class, "onClick", &pv).unwrap(), offset)),
+        &functions
+            .iter()
+            .zip(&function_code_offsets)
+            .map(|(function, offset)| {
+                (
+                    pool.method(class, &function.name, &function_proto(function))
+                        .unwrap(),
+                    *offset,
+                )
+            })
+            .collect::<Vec<_>>(),
+    );
     cursor += u32_len(class_data_bytes.len())?;
     cursor = align4(cursor)?;
     let map = cursor;
-    let map_count = 11_u32;
+    let map_count = 12_u32;
     let file_size = map + 4 + map_count * 12;
 
     let mut out = ByteWriter::new();
@@ -397,7 +1109,7 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
     size_off(&mut out, pool.strings.len(), string_ids)?;
     size_off(&mut out, pool.types.len(), type_ids)?;
     size_off(&mut out, pool.protos.len(), proto_ids)?;
-    size_off(&mut out, 0, 0)?;
+    size_off(&mut out, pool.fields.len(), field_ids)?;
     size_off(&mut out, pool.methods.len(), method_ids)?;
     size_off(&mut out, 1, class_defs)?;
     out.write_u32(file_size - data);
@@ -418,15 +1130,20 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
                 .map_or(0, |v| v.1),
         );
     }
+    for field in &pool.fields {
+        out.write_u16(pool.type_index[&field.class]);
+        out.write_u16(pool.type_index[&field.ty]);
+        out.write_u32(pool.string_index[&field.name]);
+    }
     for method in &pool.methods {
         out.write_u16(pool.type_index[&method.class]);
         out.write_u16(pool.proto_index(&method.proto)?);
-        out.write_u32(pool.string_index[method.name]);
+        out.write_u32(pool.string_index[&method.name]);
     }
     out.write_u32(u32::from(pool.type_index[class]));
     out.write_u32(1);
     out.write_u32(u32::from(pool.type_index["Landroid/app/Activity;"]));
-    out.write_u32(0);
+    out.write_u32(interfaces_off);
     out.write_u32(NO_INDEX);
     out.write_u32(0);
     out.write_u32(class_data);
@@ -442,6 +1159,13 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
             out.write_u16(0);
         }
     }
+    if interfaces_off != 0 {
+        out.align(4)?;
+        debug_assert_eq!(u32_len(out.position())?, interfaces_off);
+        out.write_u32(1);
+        out.write_u16(pool.type_index["Landroid/view/View$OnClickListener;"]);
+        out.write_u16(0);
+    }
     for (value, expected) in pool.strings.iter().zip(&string_offsets) {
         debug_assert_eq!(u32_len(out.position())?, *expected);
         out.write_bytes(&encode_uleb128(u32_len(value.encode_utf16().count())?));
@@ -450,7 +1174,35 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
     out.align(4)?;
     write_code(&mut out, 1, 1, 1, &ctor);
     out.align(4)?;
-    write_code(&mut out, 5, 2, 2, &create);
+    write_code(
+        &mut out,
+        create.registers,
+        create.ins,
+        create.outs,
+        &create.code,
+    );
+    if let (Some(method), Some(expected)) = (&click, click_code) {
+        out.align(4)?;
+        debug_assert_eq!(u32_len(out.position())?, expected);
+        write_code(
+            &mut out,
+            method.registers,
+            method.ins,
+            method.outs,
+            &method.code,
+        );
+    }
+    for (method, expected) in lowered.iter().zip(&function_code_offsets) {
+        out.align(4)?;
+        debug_assert_eq!(u32_len(out.position())?, *expected);
+        write_code(
+            &mut out,
+            method.registers,
+            method.ins,
+            method.outs,
+            &method.code,
+        );
+    }
     out.write_bytes(&class_data_bytes);
     out.align(4)?;
     let sections = [
@@ -475,6 +1227,11 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
             offset: proto_ids,
         },
         Section {
+            kind: 0x0004,
+            count: u32_len(pool.fields.len())?,
+            offset: field_ids,
+        },
+        Section {
             kind: 0x0005,
             count: u32_len(pool.methods.len())?,
             offset: method_ids,
@@ -486,7 +1243,7 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
         },
         Section {
             kind: 0x1001,
-            count: u32_len(type_lists.len())?,
+            count: u32_len(type_lists.len())? + u32::from(interfaces_off != 0),
             offset: type_lists[0].1,
         },
         Section {
@@ -496,7 +1253,7 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
         },
         Section {
             kind: 0x2001,
-            count: 2,
+            count: 2 + u32_len(lowered.len())? + u32::from(click.is_some()),
             offset: ctor_code,
         },
         Section {
@@ -525,14 +1282,52 @@ fn encode(pool: &Pool, class: &str, text: &str) -> Result<Vec<u8>, DexError> {
     Ok(out.into_bytes())
 }
 
-fn class_data_item(init: u16, init_code: u32, create: u16, create_code: u32) -> Vec<u8> {
-    let mut v = vec![0, 0, 1, 1];
-    v.extend(encode_uleb128(u32::from(init)));
-    v.extend(encode_uleb128(0x1_0001));
-    v.extend(encode_uleb128(init_code));
-    v.extend(encode_uleb128(u32::from(create)));
-    v.extend(encode_uleb128(0x4));
-    v.extend(encode_uleb128(create_code));
+fn class_data_item(
+    fields: &[u16],
+    init: u16,
+    init_code: u32,
+    create: u16,
+    create_code: u32,
+    click: Option<(u16, u32)>,
+    functions: &[(u16, u32)],
+) -> Vec<u8> {
+    let mut direct = vec![(init, 0x1_0001, init_code)];
+    direct.extend(
+        functions
+            .iter()
+            .map(|(method, code)| (*method, 0x0a, *code)),
+    );
+    direct.sort_by_key(|entry| entry.0);
+    let mut v = Vec::new();
+    v.extend(encode_uleb128(0));
+    v.extend(encode_uleb128(u32::try_from(fields.len()).unwrap()));
+    v.extend(encode_uleb128(u32::try_from(direct.len()).unwrap()));
+    v.extend(encode_uleb128(1 + u32::from(click.is_some())));
+    let mut previous_field = 0_u16;
+    for field in fields {
+        v.extend(encode_uleb128(u32::from(*field - previous_field)));
+        v.extend(encode_uleb128(0x2));
+        previous_field = *field;
+    }
+    let mut previous = 0_u16;
+    for (index, flags, code) in direct {
+        v.extend(encode_uleb128(u32::from(index - previous)));
+        v.extend(encode_uleb128(flags));
+        v.extend(encode_uleb128(code));
+        previous = index;
+    }
+    let mut virtuals = vec![(create, 0x4, create_code)];
+    if let Some(entry) = click {
+        virtuals.push((entry.0, 0x1, entry.1));
+    }
+    virtuals.sort_by_key(|entry| entry.0);
+    let mut previous_virtual = 0_u16;
+    for (method, flags, code) in virtuals {
+        v.extend(encode_uleb128(u32::from(method - previous_virtual)));
+        v.extend(encode_uleb128(flags));
+        v.extend(encode_uleb128(code));
+        previous_virtual = method;
+    }
     v
 }
 fn write_code(out: &mut ByteWriter, registers: u16, ins: u16, outs: u16, code: &[u16]) {
