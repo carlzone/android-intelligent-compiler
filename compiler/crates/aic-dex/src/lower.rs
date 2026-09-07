@@ -12,7 +12,8 @@ use crate::{
     DexError,
 };
 use aic_ir::{
-    BinaryOp, Expression, ExpressionKind, Function, Statement, StatementKind, Type, UnaryOp, Value,
+    BinaryOp, Expression, ExpressionKind, Function, Preference, Statement, StatementKind, Table,
+    Type, UnaryOp, Value,
 };
 use std::collections::BTreeMap;
 
@@ -71,6 +72,29 @@ pub struct UiLowering {
     pub add_view: u16,
     pub set_content_view: u16,
 }
+#[derive(Clone, Copy, Debug)]
+pub struct PersistenceLowering {
+    pub preferences_field: Option<u16>,
+    pub database_field: Option<u16>,
+    pub get_shared_preferences: u16,
+    pub pref_get_i32: u16,
+    pub pref_get_bool: u16,
+    pub pref_get_string: u16,
+    pub pref_edit: u16,
+    pub editor_put_i32: u16,
+    pub editor_put_bool: u16,
+    pub editor_put_string: u16,
+    pub editor_apply: u16,
+    pub open_database: u16,
+    pub database_exec_sql: u16,
+    pub database_compile: u16,
+    pub statement_bind_string: u16,
+    pub statement_execute_insert: u16,
+    pub statement_simple_long: u16,
+    pub statement_simple_string: u16,
+    pub statement_execute_update_delete: u16,
+    pub statement_close: u16,
+}
 #[derive(Clone, Copy)]
 struct Binding {
     register: Register,
@@ -90,6 +114,9 @@ struct Lowerer<'a> {
     target: Option<&'a dyn Fn(&str) -> Result<FunctionTarget, DexError>>,
     string_index: Option<&'a dyn Fn(&str) -> Result<u16, DexError>>,
     strings: Option<StringLowering>,
+    persistence: Option<PersistenceLowering>,
+    preferences: BTreeMap<String, Preference>,
+    tables: BTreeMap<String, Table>,
     outs: u16,
 }
 fn kind(t: Type) -> ValueKind {
@@ -151,6 +178,19 @@ impl Lowerer<'_> {
                 .target
                 .map_or(Ok(Type::I32), |resolve| Ok(resolve(name)?.result)),
             ExpressionKind::AndroidText { .. } => Ok(Type::String),
+            ExpressionKind::PreferenceGet { key } => self
+                .preferences
+                .get(key)
+                .map(|p| p.ty)
+                .ok_or(DexError::InvalidInput("unknown preference")),
+            ExpressionKind::DatabaseInsert { .. } => Ok(Type::I32),
+            ExpressionKind::DatabaseExists { .. } => Ok(Type::Bool),
+            ExpressionKind::DatabaseGet { table, column, .. } => self
+                .tables
+                .get(table)
+                .and_then(|t| t.columns.iter().find(|c| c.name == *column))
+                .map(|c| c.ty)
+                .ok_or(DexError::InvalidInput("unknown database column")),
         }
     }
     fn mov(&mut self, d: Register, s: Register) -> Result<(), DexError> {
@@ -418,8 +458,260 @@ impl Lowerer<'_> {
                 self.code.push(Instruction::MoveResultObject { dst: d });
                 self.outs = self.outs.max(1);
             }
+            ExpressionKind::PreferenceGet { key } => self.preference_get(key, d)?,
+            ExpressionKind::DatabaseInsert { table, values } => {
+                self.database_insert(table, values, d)?
+            }
+            ExpressionKind::DatabaseExists { table, id } => {
+                self.database_query(table, id, None, None, d)?
+            }
+            ExpressionKind::DatabaseGet {
+                table,
+                id,
+                column,
+                default,
+            } => self.database_query(table, id, Some(column), Some(default), d)?,
         }
         Ok(())
+    }
+    fn preference_get(&mut self, key: &str, dst: Register) -> Result<(), DexError> {
+        let p = self
+            .persistence
+            .ok_or(DexError::InvalidInput("missing persistence lowering"))?;
+        let preference = self
+            .preferences
+            .get(key)
+            .cloned()
+            .ok_or(DexError::InvalidInput("unknown preference"))?;
+        let this = self
+            .this
+            .ok_or(DexError::InvalidInput("preference outside activity"))?;
+        let object = self.alloc(Type::String)?;
+        let key_register = self.alloc(Type::String)?;
+        let default = self.alloc(preference.ty)?;
+        self.code.push(Instruction::IGet {
+            dst: object,
+            object: this,
+            field: p
+                .preferences_field
+                .ok_or(DexError::InvalidInput("missing preferences field"))?,
+        });
+        self.code.push(Instruction::ConstString {
+            dst: key_register,
+            string: (self
+                .string_index
+                .ok_or(DexError::InvalidInput("missing string pool"))?)(key)?,
+        });
+        self.literal(&preference.default, default)?;
+        self.code.push(Instruction::InvokeInterface {
+            method: match preference.ty {
+                Type::I32 => p.pref_get_i32,
+                Type::Bool => p.pref_get_bool,
+                Type::String => p.pref_get_string,
+            },
+            args: vec![object, key_register, default],
+        });
+        self.code.push(if preference.ty == Type::String {
+            Instruction::MoveResultObject { dst }
+        } else {
+            Instruction::MoveResult { dst }
+        });
+        self.outs = self.outs.max(3);
+        Ok(())
+    }
+    fn literal(&mut self, value: &Value, dst: Register) -> Result<(), DexError> {
+        match value {
+            Value::I32(v) => self.code.push(Instruction::Const32 { dst, value: *v }),
+            Value::Bool(v) => self.code.push(Instruction::Const4 {
+                dst,
+                value: i8::from(*v),
+            }),
+            Value::String(v) => self.code.push(Instruction::ConstString {
+                dst,
+                string: (self
+                    .string_index
+                    .ok_or(DexError::InvalidInput("missing string pool"))?)(
+                    v
+                )?,
+            }),
+        }
+        Ok(())
+    }
+    fn alloc_wide(&mut self) -> Result<u8, DexError> {
+        if self.next + 1 >= self.limit {
+            return Err(DexError::InvalidInput("wide register allocation exhausted"));
+        }
+        let result = self.next;
+        self.next += 2;
+        Ok(result)
+    }
+    fn primary_key(&self, table: &str) -> Result<String, DexError> {
+        self.tables
+            .get(table)
+            .and_then(|t| t.columns.iter().find(|c| c.primary_key))
+            .map(|c| c.name.clone())
+            .ok_or(DexError::InvalidInput("missing primary key"))
+    }
+    fn compile_statement(&mut self, sql: &str) -> Result<Register, DexError> {
+        let p = self
+            .persistence
+            .ok_or(DexError::InvalidInput("missing persistence lowering"))?;
+        let this = self
+            .this
+            .ok_or(DexError::InvalidInput("database outside activity"))?;
+        let db = self.alloc(Type::String)?;
+        let query = self.alloc(Type::String)?;
+        let statement = self.alloc(Type::String)?;
+        self.code.push(Instruction::IGet {
+            dst: db,
+            object: this,
+            field: p
+                .database_field
+                .ok_or(DexError::InvalidInput("missing database field"))?,
+        });
+        self.code.push(Instruction::ConstString {
+            dst: query,
+            string: (self
+                .string_index
+                .ok_or(DexError::InvalidInput("missing query string"))?)(sql)?,
+        });
+        self.code.push(Instruction::InvokeVirtual {
+            method: p.database_compile,
+            args: vec![db, query],
+        });
+        self.code
+            .push(Instruction::MoveResultObject { dst: statement });
+        self.outs = self.outs.max(2);
+        Ok(statement)
+    }
+    fn bind_value(
+        &mut self,
+        statement: Register,
+        index: i32,
+        value: &Expression,
+    ) -> Result<(), DexError> {
+        let saved = self.next;
+        let p = self
+            .persistence
+            .ok_or(DexError::InvalidInput("missing persistence lowering"))?;
+        let slot = self.alloc(Type::I32)?;
+        self.code.push(Instruction::Const32 {
+            dst: slot,
+            value: index,
+        });
+        let rendered = self.alloc(Type::String)?;
+        if self.ty(value)? == Type::String {
+            self.expr(value, rendered)?;
+        } else {
+            let ty = self.ty(value)?;
+            let scalar = self.alloc(ty)?;
+            self.expr(value, scalar)?;
+            let strings = self
+                .strings
+                .ok_or(DexError::InvalidInput("missing string conversions"))?;
+            self.code.push(Instruction::InvokeStatic {
+                method: if ty == Type::Bool {
+                    strings.value_of_bool
+                } else {
+                    strings.value_of_i32
+                },
+                args: vec![scalar],
+            });
+            self.code
+                .push(Instruction::MoveResultObject { dst: rendered });
+        }
+        self.code.push(Instruction::InvokeVirtual {
+            method: p.statement_bind_string,
+            args: vec![statement, slot, rendered],
+        });
+        self.outs = self.outs.max(3);
+        self.next = saved;
+        Ok(())
+    }
+    fn close_statement(&mut self, statement: Register) -> Result<(), DexError> {
+        let p = self
+            .persistence
+            .ok_or(DexError::InvalidInput("missing persistence lowering"))?;
+        self.code.push(Instruction::InvokeVirtual {
+            method: p.statement_close,
+            args: vec![statement],
+        });
+        Ok(())
+    }
+    fn database_insert(
+        &mut self,
+        table: &str,
+        values: &[(String, Expression)],
+        dst: Register,
+    ) -> Result<(), DexError> {
+        let columns = values
+            .iter()
+            .map(|v| v.0.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "INSERT INTO {table} ({columns}) VALUES ({})",
+            vec!["?"; values.len()].join(",")
+        );
+        let statement = self.compile_statement(&sql)?;
+        for (index, (_, value)) in values.iter().enumerate() {
+            self.bind_value(
+                statement,
+                i32::try_from(index + 1).map_err(|_| DexError::ArithmeticOverflow)?,
+                value,
+            )?;
+        }
+        let p = self
+            .persistence
+            .ok_or(DexError::InvalidInput("missing persistence lowering"))?;
+        self.code.push(Instruction::InvokeVirtual {
+            method: p.statement_execute_insert,
+            args: vec![statement],
+        });
+        let wide = self.alloc_wide()?;
+        self.code.push(Instruction::MoveResultWide { dst: wide });
+        self.code.push(Instruction::LongToInt { dst, src: wide });
+        self.close_statement(statement)
+    }
+    fn database_query(
+        &mut self,
+        table: &str,
+        id: &Expression,
+        column: Option<&String>,
+        default: Option<&Expression>,
+        dst: Register,
+    ) -> Result<(), DexError> {
+        let primary = self.primary_key(table)?;
+        let sql = column.map_or_else(
+            || format!("SELECT COUNT(*) FROM {table} WHERE {primary} = ?"),
+            |column| {
+                format!("SELECT COALESCE((SELECT {column} FROM {table} WHERE {primary} = ?), ?)")
+            },
+        );
+        let statement = self.compile_statement(&sql)?;
+        self.bind_value(statement, 1, id)?;
+        if let Some(default) = default {
+            self.bind_value(statement, 2, default)?;
+        }
+        let p = self
+            .persistence
+            .ok_or(DexError::InvalidInput("missing persistence lowering"))?;
+        if column.is_some() && dst.kind == ValueKind::Reference {
+            self.code.push(Instruction::InvokeVirtual {
+                method: p.statement_simple_string,
+                args: vec![statement],
+            });
+            self.code.push(Instruction::MoveResultObject { dst });
+        } else {
+            self.code.push(Instruction::InvokeVirtual {
+                method: p.statement_simple_long,
+                args: vec![statement],
+            });
+            let wide = self.alloc_wide()?;
+            self.code.push(Instruction::MoveResultWide { dst: wide });
+            self.code.push(Instruction::LongToInt { dst, src: wide });
+        }
+        self.close_statement(statement)
     }
     fn concat(
         &mut self,
@@ -664,6 +956,9 @@ pub fn lower_function(
         target: None,
         string_index: None,
         strings: None,
+        persistence: None,
+        preferences: BTreeMap::new(),
+        tables: BTreeMap::new(),
         outs: 0,
     };
     for (i, p) in function.params.iter().enumerate() {
@@ -714,6 +1009,9 @@ pub fn lower_function_typed(
         target: Some(target),
         string_index: Some(string_index),
         strings: Some(strings),
+        persistence: None,
+        preferences: BTreeMap::new(),
+        tables: BTreeMap::new(),
         outs: 0,
     };
     for (index, parameter) in function.params.iter().enumerate() {
@@ -923,7 +1221,7 @@ impl Lowerer<'_> {
                     });
                     self.next = view.index + 1;
                 }
-                StatementKind::EditText { id, hint } => {
+                StatementKind::EditText { id, hint } | StatementKind::TextInput { id, hint } => {
                     let view = self.alloc(Type::String)?;
                     let rendered = self.alloc(Type::String)?;
                     self.code.push(Instruction::NewInstance {
@@ -939,15 +1237,17 @@ impl Lowerer<'_> {
                         method: ui.edit_text_set_hint,
                         args: vec![view, rendered],
                     });
-                    let input_type = self.alloc(Type::I32)?;
-                    self.code.push(Instruction::Const4 {
-                        dst: input_type,
-                        value: 2,
-                    });
-                    self.code.push(Instruction::InvokeVirtual {
-                        method: ui.edit_text_set_input_type,
-                        args: vec![view, input_type],
-                    });
+                    if matches!(statement.kind, StatementKind::EditText { .. }) {
+                        let input_type = self.alloc(Type::I32)?;
+                        self.code.push(Instruction::Const4 {
+                            dst: input_type,
+                            value: 2,
+                        });
+                        self.code.push(Instruction::InvokeVirtual {
+                            method: ui.edit_text_set_input_type,
+                            args: vec![view, input_type],
+                        });
+                    }
                     self.outs = self.outs.max(2);
                     self.views.insert(id.clone(), view);
                     if let Some(field) = self.view_fields.get(id) {
@@ -1105,6 +1405,21 @@ impl Lowerer<'_> {
                     self.outs = self.outs.max(2);
                     self.next = text.index;
                 }
+                StatementKind::PreferenceSet { key, value } => {
+                    let saved = self.next;
+                    self.preference_set(key, value)?;
+                    self.next = saved;
+                }
+                StatementKind::DatabaseUpdate { table, id, values } => {
+                    let saved = self.next;
+                    self.database_mutation(table, Some(id), values)?;
+                    self.next = saved;
+                }
+                StatementKind::DatabaseDelete { table, id } => {
+                    let saved = self.next;
+                    self.database_mutation(table, Some(id), &[])?;
+                    self.next = saved;
+                }
                 StatementKind::Return(_) => {
                     return Err(DexError::InvalidInput("return inside onCreate"))
                 }
@@ -1112,8 +1427,101 @@ impl Lowerer<'_> {
         }
         Ok(())
     }
+    fn preference_set(&mut self, key: &str, value: &Expression) -> Result<(), DexError> {
+        let p = self
+            .persistence
+            .ok_or(DexError::InvalidInput("missing persistence lowering"))?;
+        let this = self
+            .this
+            .ok_or(DexError::InvalidInput("preference outside activity"))?;
+        let preferences = self.alloc(Type::String)?;
+        let editor = self.alloc(Type::String)?;
+        let key_register = self.alloc(Type::String)?;
+        let ty = self.ty(value)?;
+        let value_register = self.alloc(ty)?;
+        self.code.push(Instruction::IGet {
+            dst: preferences,
+            object: this,
+            field: p
+                .preferences_field
+                .ok_or(DexError::InvalidInput("missing preferences field"))?,
+        });
+        self.code.push(Instruction::InvokeInterface {
+            method: p.pref_edit,
+            args: vec![preferences],
+        });
+        self.code
+            .push(Instruction::MoveResultObject { dst: editor });
+        self.code.push(Instruction::ConstString {
+            dst: key_register,
+            string: (self
+                .string_index
+                .ok_or(DexError::InvalidInput("missing string pool"))?)(key)?,
+        });
+        self.expr(value, value_register)?;
+        self.code.push(Instruction::InvokeInterface {
+            method: match ty {
+                Type::I32 => p.editor_put_i32,
+                Type::Bool => p.editor_put_bool,
+                Type::String => p.editor_put_string,
+            },
+            args: vec![editor, key_register, value_register],
+        });
+        self.code
+            .push(Instruction::MoveResultObject { dst: editor });
+        self.code.push(Instruction::InvokeInterface {
+            method: p.editor_apply,
+            args: vec![editor],
+        });
+        self.outs = self.outs.max(3);
+        Ok(())
+    }
+    fn database_mutation(
+        &mut self,
+        table: &str,
+        id: Option<&Expression>,
+        values: &[(String, Expression)],
+    ) -> Result<(), DexError> {
+        let primary = self.primary_key(table)?;
+        let sql = if values.is_empty() {
+            format!("DELETE FROM {table} WHERE {primary} = ?")
+        } else {
+            format!(
+                "UPDATE {table} SET {} WHERE {primary} = ?",
+                values
+                    .iter()
+                    .map(|v| format!("{} = ?", v.0))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        };
+        let statement = self.compile_statement(&sql)?;
+        for (index, (_, value)) in values.iter().enumerate() {
+            self.bind_value(
+                statement,
+                i32::try_from(index + 1).map_err(|_| DexError::ArithmeticOverflow)?,
+                value,
+            )?;
+        }
+        if let Some(id) = id {
+            self.bind_value(
+                statement,
+                i32::try_from(values.len() + 1).map_err(|_| DexError::ArithmeticOverflow)?,
+                id,
+            )?;
+        }
+        let p = self
+            .persistence
+            .ok_or(DexError::InvalidInput("missing persistence lowering"))?;
+        self.code.push(Instruction::InvokeVirtual {
+            method: p.statement_execute_update_delete,
+            args: vec![statement],
+        });
+        self.close_statement(statement)
+    }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn lower_on_click(
     handlers: &[aic_ir::ClickHandler],
     target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>,
@@ -1122,6 +1530,9 @@ pub fn lower_on_click(
     ui: UiLowering,
     state_fields: BTreeMap<String, (u16, Type)>,
     view_fields: BTreeMap<String, u16>,
+    persistence: Option<PersistenceLowering>,
+    preferences: &[Preference],
+    tables: &[Table],
 ) -> Result<LoweredMethod, DexError> {
     let fallback = |name: &str| Ok(target(name)?.method);
     let this = Register {
@@ -1146,6 +1557,12 @@ pub fn lower_on_click(
         target: Some(target),
         string_index: Some(string_index),
         strings,
+        persistence,
+        preferences: preferences
+            .iter()
+            .map(|p| (p.name.clone(), p.clone()))
+            .collect(),
+        tables: tables.iter().map(|t| (t.name.clone(), t.clone())).collect(),
         outs: 0,
     };
     for handler in handlers {
@@ -1185,6 +1602,9 @@ pub fn lower_on_create(
     state_fields: BTreeMap<String, (u16, Type)>,
     view_fields: BTreeMap<String, u16>,
     states: &[aic_ir::State],
+    persistence: Option<PersistenceLowering>,
+    preferences: &[Preference],
+    tables: &[Table],
 ) -> Result<LoweredMethod, DexError> {
     let fallback = |name: &str| Ok(target(name)?.method);
     let this = Register {
@@ -1212,8 +1632,86 @@ pub fn lower_on_create(
         target: Some(target),
         string_index: Some(string_index),
         strings,
+        persistence,
+        preferences: preferences
+            .iter()
+            .map(|p| (p.name.clone(), p.clone()))
+            .collect(),
+        tables: tables.iter().map(|t| (t.name.clone(), t.clone())).collect(),
         outs: 2,
     };
+    if let Some(p) = persistence {
+        if let Some(field) = p.preferences_field {
+            let name = lowerer.alloc(Type::String)?;
+            let mode = lowerer.alloc(Type::I32)?;
+            let object = lowerer.alloc(Type::String)?;
+            lowerer.code.push(Instruction::ConstString {
+                dst: name,
+                string: string_index("aic.preferences")?,
+            });
+            lowerer.code.push(Instruction::Const4 {
+                dst: mode,
+                value: 0,
+            });
+            lowerer.code.push(Instruction::InvokeVirtual {
+                method: p.get_shared_preferences,
+                args: vec![this, name, mode],
+            });
+            lowerer
+                .code
+                .push(Instruction::MoveResultObject { dst: object });
+            lowerer.code.push(Instruction::IPut {
+                src: object,
+                object: this,
+                field,
+            });
+            lowerer.next = 0;
+            lowerer.outs = lowerer.outs.max(3);
+        }
+        if let Some(field) = p.database_field {
+            let database_name = tables.first().map_or("aic.db", |_| "aic.db");
+            let name = lowerer.alloc(Type::String)?;
+            let mode = lowerer.alloc(Type::I32)?;
+            let factory = lowerer.alloc(Type::String)?;
+            let object = lowerer.alloc(Type::String)?;
+            lowerer.code.push(Instruction::ConstString {
+                dst: name,
+                string: string_index(database_name)?,
+            });
+            lowerer.code.push(Instruction::Const4 {
+                dst: mode,
+                value: 0,
+            });
+            lowerer.code.push(Instruction::ConstNull { dst: factory });
+            lowerer.code.push(Instruction::InvokeVirtual {
+                method: p.open_database,
+                args: vec![this, name, mode, factory],
+            });
+            lowerer
+                .code
+                .push(Instruction::MoveResultObject { dst: object });
+            lowerer.code.push(Instruction::IPut {
+                src: object,
+                object: this,
+                field,
+            });
+            lowerer.outs = lowerer.outs.max(4);
+            for table in tables {
+                let sql = create_table_sql(table);
+                let query = lowerer.alloc(Type::String)?;
+                lowerer.code.push(Instruction::ConstString {
+                    dst: query,
+                    string: string_index(&sql)?,
+                });
+                lowerer.code.push(Instruction::InvokeVirtual {
+                    method: p.database_exec_sql,
+                    args: vec![object, query],
+                });
+                lowerer.next = object.index + 1;
+            }
+            lowerer.next = 0;
+        }
+    }
     for state in states {
         let register = lowerer.alloc(state.ty)?;
         lowerer.expr(&state.initial, register)?;
@@ -1233,6 +1731,35 @@ pub fn lower_on_create(
         ins: 2,
         outs: lowerer.outs,
     })
+}
+
+#[must_use]
+pub fn create_table_sql(table: &Table) -> String {
+    format!(
+        "CREATE TABLE IF NOT EXISTS {} ({})",
+        table.name,
+        table
+            .columns
+            .iter()
+            .map(|column| {
+                let mut value = format!(
+                    "{} {}",
+                    column.name,
+                    match column.ty {
+                        Type::I32 | Type::Bool => "INTEGER",
+                        Type::String => "TEXT",
+                    }
+                );
+                if column.primary_key {
+                    value.push_str(" PRIMARY KEY AUTOINCREMENT");
+                } else {
+                    value.push_str(" NOT NULL");
+                }
+                value
+            })
+            .collect::<Vec<_>>()
+            .join(",")
+    )
 }
 
 #[cfg(test)]

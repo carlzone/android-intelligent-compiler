@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+aic-build = { path = "../aic-build" }
 aic-dex = { path = "../aic-dex" }
 aic-ir = { path = "../aic-ir" }
 aic-opt = { path = "../aic-opt" }

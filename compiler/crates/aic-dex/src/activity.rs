@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use aic_ir::{
-    Expression, ExpressionKind, Function, Program, Statement, StatementKind, Type, Value,
+    Capability, Expression, ExpressionKind, Function, Program, Statement, StatementKind, Type,
+    Value,
 };
 
 use crate::{
@@ -52,7 +53,10 @@ impl Pool {
         let functions = &program.functions;
         let runtime = !functions.is_empty()
             || !program.activity.state.is_empty()
-            || !program.activity.on_click.is_empty();
+            || !program.activity.on_click.is_empty()
+            || !program.capabilities.is_empty();
+        let key_value = program.capabilities.contains(&Capability::KeyValue);
+        let sqlite = program.capabilities.contains(&Capability::Sqlite);
         let mut protos = vec![
             Proto {
                 ret: "V",
@@ -140,6 +144,74 @@ impl Pool {
             ]);
             protos.extend(functions.iter().map(function_proto));
         }
+        if key_value || sqlite {
+            protos.extend([
+                Proto {
+                    ret: "Landroid/content/SharedPreferences;",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+                Proto {
+                    ret: "I",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+                Proto {
+                    ret: "Z",
+                    params: vec!["Ljava/lang/String;", "Z"],
+                },
+                Proto {
+                    ret: "Ljava/lang/String;",
+                    params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                },
+                Proto {
+                    ret: "Landroid/content/SharedPreferences$Editor;",
+                    params: vec![],
+                },
+                Proto {
+                    ret: "Landroid/content/SharedPreferences$Editor;",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+                Proto {
+                    ret: "Landroid/content/SharedPreferences$Editor;",
+                    params: vec!["Ljava/lang/String;", "Z"],
+                },
+                Proto {
+                    ret: "Landroid/content/SharedPreferences$Editor;",
+                    params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                },
+            ]);
+        }
+        if key_value || sqlite {
+            protos.extend([
+                Proto {
+                    ret: "Landroid/database/sqlite/SQLiteDatabase;",
+                    params: vec![
+                        "Ljava/lang/String;",
+                        "I",
+                        "Landroid/database/sqlite/SQLiteDatabase$CursorFactory;",
+                    ],
+                },
+                Proto {
+                    ret: "V",
+                    params: vec!["Ljava/lang/String;"],
+                },
+                Proto {
+                    ret: "Landroid/database/sqlite/SQLiteStatement;",
+                    params: vec!["Ljava/lang/String;"],
+                },
+                Proto {
+                    ret: "V",
+                    params: vec!["I", "Ljava/lang/String;"],
+                },
+                Proto {
+                    ret: "J",
+                    params: vec![],
+                },
+                Proto {
+                    ret: "I",
+                    params: vec![],
+                },
+            ]);
+        }
         let mut fields = Vec::new();
         for state in &program.activity.state {
             fields.push(Field {
@@ -156,6 +228,20 @@ impl Pool {
                     ty: ty.into(),
                 });
             }
+        }
+        if key_value {
+            fields.push(Field {
+                class: class.into(),
+                name: "platform$preferences".into(),
+                ty: "Landroid/content/SharedPreferences;".into(),
+            });
+        }
+        if sqlite {
+            fields.push(Field {
+                class: class.into(),
+                name: "platform$database".into(),
+                ty: "Landroid/database/sqlite/SQLiteDatabase;".into(),
+            });
         }
         let interactive = !program.activity.on_click.is_empty();
         let mut methods = vec![
@@ -372,6 +458,162 @@ impl Pool {
                 },
             ]);
         }
+        if key_value || sqlite {
+            methods.extend([
+                Method {
+                    class: "Landroid/app/Activity;".into(),
+                    name: "getSharedPreferences".into(),
+                    proto: Proto {
+                        ret: "Landroid/content/SharedPreferences;",
+                        params: vec!["Ljava/lang/String;", "I"],
+                    },
+                },
+                Method {
+                    class: "Landroid/content/SharedPreferences;".into(),
+                    name: "getInt".into(),
+                    proto: Proto {
+                        ret: "I",
+                        params: vec!["Ljava/lang/String;", "I"],
+                    },
+                },
+                Method {
+                    class: "Landroid/content/SharedPreferences;".into(),
+                    name: "getBoolean".into(),
+                    proto: Proto {
+                        ret: "Z",
+                        params: vec!["Ljava/lang/String;", "Z"],
+                    },
+                },
+                Method {
+                    class: "Landroid/content/SharedPreferences;".into(),
+                    name: "getString".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/String;",
+                        params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Landroid/content/SharedPreferences;".into(),
+                    name: "edit".into(),
+                    proto: Proto {
+                        ret: "Landroid/content/SharedPreferences$Editor;",
+                        params: vec![],
+                    },
+                },
+                Method {
+                    class: "Landroid/content/SharedPreferences$Editor;".into(),
+                    name: "putInt".into(),
+                    proto: Proto {
+                        ret: "Landroid/content/SharedPreferences$Editor;",
+                        params: vec!["Ljava/lang/String;", "I"],
+                    },
+                },
+                Method {
+                    class: "Landroid/content/SharedPreferences$Editor;".into(),
+                    name: "putBoolean".into(),
+                    proto: Proto {
+                        ret: "Landroid/content/SharedPreferences$Editor;",
+                        params: vec!["Ljava/lang/String;", "Z"],
+                    },
+                },
+                Method {
+                    class: "Landroid/content/SharedPreferences$Editor;".into(),
+                    name: "putString".into(),
+                    proto: Proto {
+                        ret: "Landroid/content/SharedPreferences$Editor;",
+                        params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Landroid/content/SharedPreferences$Editor;".into(),
+                    name: "apply".into(),
+                    proto: Proto {
+                        ret: "V",
+                        params: vec![],
+                    },
+                },
+            ]);
+        }
+        if key_value || sqlite {
+            methods.extend([
+                Method {
+                    class: "Landroid/app/Activity;".into(),
+                    name: "openOrCreateDatabase".into(),
+                    proto: Proto {
+                        ret: "Landroid/database/sqlite/SQLiteDatabase;",
+                        params: vec![
+                            "Ljava/lang/String;",
+                            "I",
+                            "Landroid/database/sqlite/SQLiteDatabase$CursorFactory;",
+                        ],
+                    },
+                },
+                Method {
+                    class: "Landroid/database/sqlite/SQLiteDatabase;".into(),
+                    name: "execSQL".into(),
+                    proto: Proto {
+                        ret: "V",
+                        params: vec!["Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Landroid/database/sqlite/SQLiteDatabase;".into(),
+                    name: "compileStatement".into(),
+                    proto: Proto {
+                        ret: "Landroid/database/sqlite/SQLiteStatement;",
+                        params: vec!["Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Landroid/database/sqlite/SQLiteStatement;".into(),
+                    name: "bindString".into(),
+                    proto: Proto {
+                        ret: "V",
+                        params: vec!["I", "Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Landroid/database/sqlite/SQLiteStatement;".into(),
+                    name: "executeInsert".into(),
+                    proto: Proto {
+                        ret: "J",
+                        params: vec![],
+                    },
+                },
+                Method {
+                    class: "Landroid/database/sqlite/SQLiteStatement;".into(),
+                    name: "simpleQueryForLong".into(),
+                    proto: Proto {
+                        ret: "J",
+                        params: vec![],
+                    },
+                },
+                Method {
+                    class: "Landroid/database/sqlite/SQLiteStatement;".into(),
+                    name: "simpleQueryForString".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/String;",
+                        params: vec![],
+                    },
+                },
+                Method {
+                    class: "Landroid/database/sqlite/SQLiteStatement;".into(),
+                    name: "executeUpdateDelete".into(),
+                    proto: Proto {
+                        ret: "I",
+                        params: vec![],
+                    },
+                },
+                Method {
+                    class: "Landroid/database/sqlite/SQLiteStatement;".into(),
+                    name: "close".into(),
+                    proto: Proto {
+                        ret: "V",
+                        params: vec![],
+                    },
+                },
+            ]);
+        }
         let mut strings = BTreeSet::new();
         for value in [
             class,
@@ -430,6 +672,55 @@ impl Pool {
                 strings.insert(value.into());
             }
             strings.extend(functions.iter().map(|function| function.name.clone()));
+        }
+        if key_value || sqlite {
+            for value in [
+                "Landroid/content/SharedPreferences;",
+                "Landroid/content/SharedPreferences$Editor;",
+                "platform$preferences",
+                "getSharedPreferences",
+                "getInt",
+                "getBoolean",
+                "getString",
+                "edit",
+                "putInt",
+                "putBoolean",
+                "putString",
+                "apply",
+                "aic.preferences",
+            ] {
+                strings.insert(value.into());
+            }
+        }
+        if key_value || sqlite {
+            for value in [
+                "Landroid/database/sqlite/SQLiteDatabase;",
+                "Landroid/database/sqlite/SQLiteDatabase$CursorFactory;",
+                "Landroid/database/sqlite/SQLiteStatement;",
+                "J",
+                "platform$database",
+                "openOrCreateDatabase",
+                "execSQL",
+                "compileStatement",
+                "bindString",
+                "executeInsert",
+                "simpleQueryForLong",
+                "simpleQueryForString",
+                "executeUpdateDelete",
+                "close",
+                "aic.db",
+            ] {
+                strings.insert(value.into());
+            }
+        }
+        if let Some(database) = &program.database {
+            for table in &database.tables {
+                strings.insert(crate::lower::create_table_sql(table));
+            }
+        }
+        collect_persistence_sql(&program.activity.on_create, program, &mut strings);
+        for handler in &program.activity.on_click {
+            collect_persistence_sql(&handler.body, program, &mut strings);
         }
         collect_program_strings(program, &mut strings);
         strings.extend(fields.iter().map(|field| field.name.clone()));
@@ -545,6 +836,7 @@ fn view_id(statement: &Statement) -> Option<&str> {
         | StatementKind::TextView { id, .. }
         | StatementKind::Button { id, .. }
         | StatementKind::EditText { id, .. }
+        | StatementKind::TextInput { id, .. }
         | StatementKind::ScrollView { id } => Some(id),
         _ => None,
     }
@@ -554,7 +846,9 @@ fn view_field(statement: &Statement) -> Option<(&str, &'static str)> {
         StatementKind::LinearLayout { id, .. } => Some((id, "Landroid/widget/LinearLayout;")),
         StatementKind::TextView { id, .. } => Some((id, "Landroid/widget/TextView;")),
         StatementKind::Button { id, .. } => Some((id, "Landroid/widget/Button;")),
-        StatementKind::EditText { id, .. } => Some((id, "Landroid/widget/EditText;")),
+        StatementKind::EditText { id, .. } | StatementKind::TextInput { id, .. } => {
+            Some((id, "Landroid/widget/EditText;"))
+        }
         StatementKind::ScrollView { id } => Some((id, "Landroid/widget/ScrollView;")),
         _ => None,
     }
@@ -571,6 +865,11 @@ fn collect_program_strings(program: &Program, strings: &mut BTreeSet<String>) {
     for state in &program.activity.state {
         collect_expression_strings(&state.initial, strings);
     }
+    for preference in &program.preferences {
+        if let Value::String(value) = &preference.default {
+            strings.insert(value.clone());
+        }
+    }
 }
 
 fn collect_statement_strings(statements: &[Statement], strings: &mut BTreeSet<String>) {
@@ -582,12 +881,29 @@ fn collect_statement_strings(statements: &[Statement], strings: &mut BTreeSet<St
             | StatementKind::TextView { text: value, .. }
             | StatementKind::Button { text: value, .. }
             | StatementKind::EditText { hint: value, .. }
+            | StatementKind::TextInput { hint: value, .. }
             | StatementKind::SetText { text: value, .. } => {
                 collect_expression_strings(value, strings);
             }
             StatementKind::SetTextColor { color, .. }
             | StatementKind::SetBackgroundColor { color, .. } => {
                 strings.insert(color.clone());
+            }
+            StatementKind::PreferenceSet { key, value } => {
+                strings.insert(key.clone());
+                collect_expression_strings(value, strings);
+            }
+            StatementKind::DatabaseUpdate { table, id, values } => {
+                strings.insert(table.clone());
+                collect_expression_strings(id, strings);
+                for (column, value) in values {
+                    strings.insert(column.clone());
+                    collect_expression_strings(value, strings);
+                }
+            }
+            StatementKind::DatabaseDelete { table, id } => {
+                strings.insert(table.clone());
+                collect_expression_strings(id, strings);
             }
             StatementKind::If {
                 condition,
@@ -632,6 +948,147 @@ fn collect_expression_strings(expression: &Expression, strings: &mut BTreeSet<St
         ExpressionKind::AndroidText { .. }
         | ExpressionKind::Literal(_)
         | ExpressionKind::Name(_) => {}
+        ExpressionKind::PreferenceGet { key } => {
+            strings.insert(key.clone());
+        }
+        ExpressionKind::DatabaseInsert { table, values } => {
+            strings.insert(table.clone());
+            for (column, value) in values {
+                strings.insert(column.clone());
+                collect_expression_strings(value, strings);
+            }
+        }
+        ExpressionKind::DatabaseExists { table, id } => {
+            strings.insert(table.clone());
+            collect_expression_strings(id, strings);
+        }
+        ExpressionKind::DatabaseGet {
+            table,
+            id,
+            column,
+            default,
+        } => {
+            strings.insert(table.clone());
+            strings.insert(column.clone());
+            collect_expression_strings(id, strings);
+            collect_expression_strings(default, strings);
+        }
+    }
+}
+fn primary(program: &Program, table: &str) -> String {
+    program
+        .database
+        .as_ref()
+        .and_then(|d| d.tables.iter().find(|t| t.name == table))
+        .and_then(|t| t.columns.iter().find(|c| c.primary_key))
+        .map_or_else(|| "id".into(), |c| c.name.clone())
+}
+#[allow(clippy::too_many_lines)]
+fn collect_persistence_sql(
+    statements: &[Statement],
+    program: &Program,
+    strings: &mut BTreeSet<String>,
+) {
+    fn expression(value: &Expression, program: &Program, strings: &mut BTreeSet<String>) {
+        match &value.kind {
+            ExpressionKind::DatabaseInsert { table, values } => {
+                strings.insert(format!(
+                    "INSERT INTO {table} ({}) VALUES ({})",
+                    values
+                        .iter()
+                        .map(|v| v.0.as_str())
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    vec!["?"; values.len()].join(",")
+                ));
+                for (_, v) in values {
+                    expression(v, program, strings);
+                }
+            }
+            ExpressionKind::DatabaseExists { table, id } => {
+                strings.insert(format!(
+                    "SELECT COUNT(*) FROM {table} WHERE {} = ?",
+                    primary(program, table)
+                ));
+                expression(id, program, strings);
+            }
+            ExpressionKind::DatabaseGet {
+                table,
+                id,
+                column,
+                default,
+            } => {
+                strings.insert(format!(
+                    "SELECT COALESCE((SELECT {column} FROM {table} WHERE {} = ?), ?)",
+                    primary(program, table)
+                ));
+                expression(id, program, strings);
+                expression(default, program, strings);
+            }
+            ExpressionKind::Unary { value, .. } => expression(value, program, strings),
+            ExpressionKind::Binary { left, right, .. } => {
+                expression(left, program, strings);
+                expression(right, program, strings);
+            }
+            ExpressionKind::Call { args, .. } => {
+                for arg in args {
+                    expression(arg, program, strings);
+                }
+            }
+            _ => {}
+        }
+    }
+    for statement in statements {
+        match &statement.kind {
+            StatementKind::DatabaseUpdate { table, id, values } => {
+                strings.insert(format!(
+                    "UPDATE {table} SET {} WHERE {} = ?",
+                    values
+                        .iter()
+                        .map(|v| format!("{} = ?", v.0))
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    primary(program, table)
+                ));
+                expression(id, program, strings);
+                for (_, value) in values {
+                    expression(value, program, strings);
+                }
+            }
+            StatementKind::DatabaseDelete { table, id } => {
+                strings.insert(format!(
+                    "DELETE FROM {table} WHERE {} = ?",
+                    primary(program, table)
+                ));
+                expression(id, program, strings);
+            }
+            StatementKind::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                expression(condition, program, strings);
+                collect_persistence_sql(then_body, program, strings);
+                collect_persistence_sql(else_body, program, strings);
+            }
+            StatementKind::For {
+                start, end, body, ..
+            } => {
+                expression(start, program, strings);
+                expression(end, program, strings);
+                collect_persistence_sql(body, program, strings);
+            }
+            StatementKind::Declare { value, .. }
+            | StatementKind::Assign { value, .. }
+            | StatementKind::Return(value)
+            | StatementKind::TextView { text: value, .. }
+            | StatementKind::Button { text: value, .. }
+            | StatementKind::EditText { hint: value, .. }
+            | StatementKind::TextInput { hint: value, .. }
+            | StatementKind::SetText { text: value, .. }
+            | StatementKind::PreferenceSet { value, .. } => expression(value, program, strings),
+            _ => {}
+        }
     }
 }
 
@@ -829,6 +1286,166 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             .ok_or(DexError::InvalidInput("missing collected string literal"))
             .and_then(|index| u16::try_from(index).map_err(|_| DexError::IndexOverflow("string")))
     };
+    let persistence_lowering = if program.capabilities.is_empty() {
+        None
+    } else {
+        Some(crate::lower::PersistenceLowering {
+            preferences_field: program
+                .capabilities
+                .contains(&Capability::KeyValue)
+                .then(|| pool.field(class, "platform$preferences"))
+                .transpose()?,
+            database_field: program
+                .capabilities
+                .contains(&Capability::Sqlite)
+                .then(|| pool.field(class, "platform$database"))
+                .transpose()?,
+            get_shared_preferences: pool.method(
+                "Landroid/app/Activity;",
+                "getSharedPreferences",
+                &Proto {
+                    ret: "Landroid/content/SharedPreferences;",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+            )?,
+            pref_get_i32: pool.method(
+                "Landroid/content/SharedPreferences;",
+                "getInt",
+                &Proto {
+                    ret: "I",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+            )?,
+            pref_get_bool: pool.method(
+                "Landroid/content/SharedPreferences;",
+                "getBoolean",
+                &Proto {
+                    ret: "Z",
+                    params: vec!["Ljava/lang/String;", "Z"],
+                },
+            )?,
+            pref_get_string: pool.method(
+                "Landroid/content/SharedPreferences;",
+                "getString",
+                &Proto {
+                    ret: "Ljava/lang/String;",
+                    params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                },
+            )?,
+            pref_edit: pool.method(
+                "Landroid/content/SharedPreferences;",
+                "edit",
+                &Proto {
+                    ret: "Landroid/content/SharedPreferences$Editor;",
+                    params: vec![],
+                },
+            )?,
+            editor_put_i32: pool.method(
+                "Landroid/content/SharedPreferences$Editor;",
+                "putInt",
+                &Proto {
+                    ret: "Landroid/content/SharedPreferences$Editor;",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+            )?,
+            editor_put_bool: pool.method(
+                "Landroid/content/SharedPreferences$Editor;",
+                "putBoolean",
+                &Proto {
+                    ret: "Landroid/content/SharedPreferences$Editor;",
+                    params: vec!["Ljava/lang/String;", "Z"],
+                },
+            )?,
+            editor_put_string: pool.method(
+                "Landroid/content/SharedPreferences$Editor;",
+                "putString",
+                &Proto {
+                    ret: "Landroid/content/SharedPreferences$Editor;",
+                    params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                },
+            )?,
+            editor_apply: pool.method(
+                "Landroid/content/SharedPreferences$Editor;",
+                "apply",
+                &p0,
+            )?,
+            open_database: pool.method(
+                "Landroid/app/Activity;",
+                "openOrCreateDatabase",
+                &Proto {
+                    ret: "Landroid/database/sqlite/SQLiteDatabase;",
+                    params: vec![
+                        "Ljava/lang/String;",
+                        "I",
+                        "Landroid/database/sqlite/SQLiteDatabase$CursorFactory;",
+                    ],
+                },
+            )?,
+            database_exec_sql: pool.method(
+                "Landroid/database/sqlite/SQLiteDatabase;",
+                "execSQL",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Ljava/lang/String;"],
+                },
+            )?,
+            database_compile: pool.method(
+                "Landroid/database/sqlite/SQLiteDatabase;",
+                "compileStatement",
+                &Proto {
+                    ret: "Landroid/database/sqlite/SQLiteStatement;",
+                    params: vec!["Ljava/lang/String;"],
+                },
+            )?,
+            statement_bind_string: pool.method(
+                "Landroid/database/sqlite/SQLiteStatement;",
+                "bindString",
+                &Proto {
+                    ret: "V",
+                    params: vec!["I", "Ljava/lang/String;"],
+                },
+            )?,
+            statement_execute_insert: pool.method(
+                "Landroid/database/sqlite/SQLiteStatement;",
+                "executeInsert",
+                &Proto {
+                    ret: "J",
+                    params: vec![],
+                },
+            )?,
+            statement_simple_long: pool.method(
+                "Landroid/database/sqlite/SQLiteStatement;",
+                "simpleQueryForLong",
+                &Proto {
+                    ret: "J",
+                    params: vec![],
+                },
+            )?,
+            statement_simple_string: pool.method(
+                "Landroid/database/sqlite/SQLiteStatement;",
+                "simpleQueryForString",
+                &pstring,
+            )?,
+            statement_execute_update_delete: pool.method(
+                "Landroid/database/sqlite/SQLiteStatement;",
+                "executeUpdateDelete",
+                &Proto {
+                    ret: "I",
+                    params: vec![],
+                },
+            )?,
+            statement_close: pool.method(
+                "Landroid/database/sqlite/SQLiteStatement;",
+                "close",
+                &p0,
+            )?,
+        })
+    };
+    let preferences = &program.preferences;
+    let tables = program
+        .database
+        .as_ref()
+        .map_or(&[][..], |database| database.tables.as_slice());
     let create = crate::lower_on_create(
         &program.activity.on_create,
         &resolve_target,
@@ -915,6 +1532,9 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             .map(|id| Ok((id.clone(), pool.field(class, &format!("view${id}"))?)))
             .collect::<Result<BTreeMap<_, _>, DexError>>()?,
         &program.activity.state,
+        persistence_lowering,
+        preferences,
+        tables,
     )?;
     let click = if program.activity.on_click.is_empty() {
         None
@@ -1008,6 +1628,9 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 .filter_map(|statement| view_id(statement).map(str::to_owned))
                 .map(|id| Ok((id.clone(), pool.field(class, &format!("view${id}"))?)))
                 .collect::<Result<BTreeMap<_, _>, DexError>>()?,
+            persistence_lowering,
+            preferences,
+            tables,
         )?)
     };
 

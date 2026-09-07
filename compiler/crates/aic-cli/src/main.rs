@@ -1,6 +1,7 @@
-use aic_dex::{encode_activity_dex, encode_minimal_dex};
-use aic_ir::{parse_program, MinimalClass, Program};
-use aic_opt::{optimize, CompilerOptions, OptimizationLevel};
+use aic_build::{compile_source, inject_stored_zip};
+use aic_dex::encode_minimal_dex;
+use aic_ir::MinimalClass;
+use aic_opt::{CompilerOptions, OptimizationLevel};
 use std::{
     env,
     error::Error,
@@ -51,23 +52,24 @@ fn compile(args: &[OsString]) -> Result<(), Box<dyn Error>> {
         Some("1") => OptimizationLevel::Basic,
         _ => return Err("unsupported optimization level; expected 0 or 1".into()),
     };
-    let program = optimize(
-        parse_program(&fs::read_to_string(input)?)?,
+    let artifacts = compile_source(
+        &fs::read_to_string(input)?,
         CompilerOptions { optimization_level },
-    );
+    )?;
     fs::create_dir_all(&output)?;
-    write_file(&output.join("classes.dex"), &encode_activity_dex(&program)?)?;
+    write_file(
+        &output.join("AndroidManifest.axml"),
+        &artifacts.binary_manifest,
+    )?;
+    write_file(&output.join("unsigned.apk"), &artifacts.unsigned_apk)?;
+    write_file(&output.join("classes.dex"), &artifacts.dex)?;
     write_file(
         &output.join("AndroidManifest.xml"),
-        manifest(&program).as_bytes(),
+        artifacts.manifest.as_bytes(),
     )?;
     write_file(
         &output.join("build-profile.txt"),
-        format!(
-            "profile=android-35\ndex=035\nminSdk=23\ntargetSdk=35\noptLevel={}\n",
-            i32::from(optimization_level != OptimizationLevel::None)
-        )
-        .as_bytes(),
+        artifacts.build_profile.as_bytes(),
     )?;
     println!("compiled {}", output.display());
     Ok(())
@@ -101,102 +103,4 @@ fn write_file(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     }
     fs::write(path, bytes)?;
     Ok(())
-}
-fn xml(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('"', "&quot;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-fn manifest(p: &Program) -> String {
-    format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"{}\">\n  <uses-sdk android:minSdkVersion=\"23\" android:targetSdkVersion=\"35\" />\n  <application android:label=\"{}\" android:theme=\"@android:style/Theme.Material.Light.NoActionBar\">\n    <activity android:name=\".{}\" android:exported=\"true\">\n      <intent-filter>\n        <action android:name=\"android.intent.action.MAIN\" />\n        <category android:name=\"android.intent.category.LAUNCHER\" />\n      </intent-filter>\n    </activity>\n  </application>\n</manifest>\n", xml(&p.package), xml(&p.label), xml(&p.activity.name))
-}
-
-fn inject_stored_zip(base: &[u8], name: &str, data: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
-    let eocd = base
-        .windows(4)
-        .rposition(|w| w == [0x50, 0x4b, 0x05, 0x06])
-        .ok_or("base APK has no ZIP end record")?;
-    if eocd + 22 > base.len() {
-        return Err("truncated ZIP end record".into());
-    }
-    let entries = u16::from_le_bytes(base[eocd + 10..eocd + 12].try_into()?);
-    let central_size = u32::from_le_bytes(base[eocd + 12..eocd + 16].try_into()?) as usize;
-    let central_offset = u32::from_le_bytes(base[eocd + 16..eocd + 20].try_into()?) as usize;
-    if central_offset + central_size > base.len() {
-        return Err("invalid ZIP central directory".into());
-    }
-    let mut out = base[..central_offset].to_vec();
-    let local_offset = u32::try_from(out.len())?;
-    let crc = crc32(data);
-    let size = u32::try_from(data.len())?;
-    let name_bytes = name.as_bytes();
-    let name_len = u16::try_from(name_bytes.len())?;
-    out.extend(0x0403_4b50_u32.to_le_bytes());
-    out.extend(20_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(crc.to_le_bytes());
-    out.extend(size.to_le_bytes());
-    out.extend(size.to_le_bytes());
-    out.extend(name_len.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(name_bytes);
-    out.extend(data);
-    let new_central = u32::try_from(out.len())?;
-    out.extend(&base[central_offset..central_offset + central_size]);
-    out.extend(0x0201_4b50_u32.to_le_bytes());
-    out.extend(20_u16.to_le_bytes());
-    out.extend(20_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(crc.to_le_bytes());
-    out.extend(size.to_le_bytes());
-    out.extend(size.to_le_bytes());
-    out.extend(name_len.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u32.to_le_bytes());
-    out.extend(local_offset.to_le_bytes());
-    out.extend(name_bytes);
-    let new_size = u32::try_from(out.len())? - new_central;
-    out.extend(0x0605_4b50_u32.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    out.extend((entries + 1).to_le_bytes());
-    out.extend((entries + 1).to_le_bytes());
-    out.extend(new_size.to_le_bytes());
-    out.extend(new_central.to_le_bytes());
-    out.extend(0_u16.to_le_bytes());
-    Ok(out)
-}
-fn crc32(data: &[u8]) -> u32 {
-    let mut crc = u32::MAX;
-    for byte in data {
-        crc ^= u32::from(*byte);
-        for _ in 0..8 {
-            crc = (crc >> 1) ^ (0xedb8_8320 & 0_u32.wrapping_sub(crc & 1));
-        }
-    }
-    !crc
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn escapes_manifest() {
-        assert_eq!(xml("a&b"), "a&amp;b");
-    }
-    #[test]
-    fn known_crc() {
-        assert_eq!(crc32(b"123456789"), 0xcbf4_3926);
-    }
 }

@@ -1,8 +1,47 @@
 use aic_dex::encode_activity_dex;
 use aic_ir::parse_program;
+use aic_opt::{optimize, CompilerOptions};
 
 fn u32_at(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+}
+
+fn dex_strings(bytes: &[u8]) -> Vec<String> {
+    let count = u32_at(bytes, 56) as usize;
+    let ids = u32_at(bytes, 60) as usize;
+    (0..count)
+        .map(|index| {
+            let mut at = u32_at(bytes, ids + index * 4) as usize;
+            while bytes[at] & 0x80 != 0 {
+                at += 1;
+            }
+            at += 1;
+            let end = bytes[at..].iter().position(|byte| *byte == 0).unwrap() + at;
+            std::str::from_utf8(&bytes[at..end]).unwrap().to_owned()
+        })
+        .collect()
+}
+
+#[test]
+fn m5_removes_unreachable_pool_entries_and_deduplicates_strings() {
+    let source = include_str!("../../../testdata/m5-optimizer.aic");
+    let original = parse_program(source).unwrap();
+    let optimized = optimize(original.clone(), CompilerOptions::default());
+    let o0 = encode_activity_dex(&original).unwrap();
+    let o1 = encode_activity_dex(&optimized).unwrap();
+    let strings = dex_strings(&o1);
+    assert!(o1.len() < o0.len());
+    assert!(!strings.iter().any(|value| value == "unused_message"
+        || value == "unused helper payload"
+        || value == "unreachable resource"));
+    assert_eq!(
+        strings
+            .iter()
+            .filter(|value| value.as_str() == "Count: ")
+            .count(),
+        1
+    );
+    assert_eq!(o1, encode_activity_dex(&optimized).unwrap());
 }
 
 #[test]
@@ -170,4 +209,36 @@ fn m3_calculator_contains_runtime_input_operations() {
             "missing {symbol}"
         );
     }
+}
+
+#[test]
+fn m4_emits_deterministic_governed_persistence() {
+    let program = parse_program(include_str!("../../../testdata/notes.aic")).unwrap();
+    let bytes = encode_activity_dex(&program).unwrap();
+    assert_eq!(bytes, encode_activity_dex(&program).unwrap());
+    for symbol in [
+        "Landroid/content/SharedPreferences;",
+        "Landroid/database/sqlite/SQLiteDatabase;",
+        "Landroid/database/sqlite/SQLiteStatement;",
+        "CREATE TABLE IF NOT EXISTS notes",
+        "INSERT INTO notes (title,body) VALUES (?,?)",
+        "bindString",
+        "close",
+    ] {
+        assert!(
+            bytes
+                .windows(symbol.len())
+                .any(|value| value == symbol.as_bytes()),
+            "missing {symbol}"
+        );
+    }
+    let hello =
+        encode_activity_dex(&parse_program(include_str!("../../../testdata/hello.aic")).unwrap())
+            .unwrap();
+    assert!(!hello
+        .windows("SQLiteDatabase".len())
+        .any(|value| value == b"SQLiteDatabase"));
+    assert!(!hello
+        .windows("SharedPreferences".len())
+        .any(|value| value == b"SharedPreferences"));
 }

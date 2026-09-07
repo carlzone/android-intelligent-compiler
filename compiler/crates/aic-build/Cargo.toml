@@ -1,0 +1,14 @@
+[package]
+name = "aic-build"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aic-res = { path = "../aic-res" }
+aic-ir = { path = "../aic-ir" }
+aic-opt = { path = "../aic-opt" }
+aic-dex = { path = "../aic-dex" }
+
+[lints]
+workspace = true

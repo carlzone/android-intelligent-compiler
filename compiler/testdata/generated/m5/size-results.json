@@ -1,0 +1,14 @@
+[
+    {
+        "optimizationLevel":  0,
+        "dexBytes":  4476,
+        "unsignedApkBytes":  5516,
+        "signedApkBytes":  12691
+    },
+    {
+        "optimizationLevel":  1,
+        "dexBytes":  3100,
+        "unsignedApkBytes":  4140,
+        "signedApkBytes":  12691
+    }
+]

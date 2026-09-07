@@ -1,0 +1,65 @@
+aic_version 0.1
+app "AIC Calculator" package "dev.aic.generated.calculator" {
+  activity MainActivity {
+    on_create {
+      let scroll = android.scroll_view()
+      let root = android.linear_layout(orientation: vertical)
+      let first = android.edit_text(hint: "First integer")
+      let second = android.edit_text(hint: "Second integer")
+      let result = android.text_view(text: "Result: ready")
+      let add = android.button(text: "Add")
+      let subtract = android.button(text: "Subtract")
+      let multiply = android.button(text: "Multiply")
+      let divide = android.button(text: "Divide")
+      android.set_layout(view: scroll, width: match_parent, height: match_parent, weight: 0)
+      android.set_layout(view: root, width: match_parent, height: wrap_content, weight: 0)
+      android.set_background_color(view: root, color: "#FFFFFF")
+      android.add_view(parent: root, child: first)
+      android.add_view(parent: root, child: second)
+      android.add_view(parent: root, child: result)
+      android.add_view(parent: root, child: add)
+      android.add_view(parent: root, child: subtract)
+      android.add_view(parent: root, child: multiply)
+      android.add_view(parent: root, child: divide)
+      android.add_view(parent: scroll, child: root)
+      android.set_content_view(scroll)
+    }
+    on_click(add) {
+      let first_text: string = android.get_text(first)
+      let second_text: string = android.get_text(second)
+      if valid_i32(first_text) && valid_i32(second_text) {
+        let value: i32 = i32(first_text) + i32(second_text)
+        android.set_text(view: result, text: string(value))
+      } else { android.set_text(view: result, text: "Invalid input") }
+    }
+    on_click(subtract) {
+      let first_text: string = android.get_text(first)
+      let second_text: string = android.get_text(second)
+      if valid_i32(first_text) && valid_i32(second_text) {
+        let value: i32 = i32(first_text) - i32(second_text)
+        android.set_text(view: result, text: string(value))
+      } else { android.set_text(view: result, text: "Invalid input") }
+    }
+    on_click(multiply) {
+      let first_text: string = android.get_text(first)
+      let second_text: string = android.get_text(second)
+      if valid_i32(first_text) && valid_i32(second_text) {
+        let value: i32 = i32(first_text) * i32(second_text)
+        android.set_text(view: result, text: string(value))
+      } else { android.set_text(view: result, text: "Invalid input") }
+    }
+    on_click(divide) {
+      let first_text: string = android.get_text(first)
+      let second_text: string = android.get_text(second)
+      if valid_i32(first_text) && valid_i32(second_text) {
+        let left: i32 = i32(first_text)
+        let right: i32 = i32(second_text)
+        if right == 0 {
+          android.set_text(view: result, text: "Cannot divide by zero")
+        } else {
+          android.set_text(view: result, text: string(left / right))
+        }
+      } else { android.set_text(view: result, text: "Invalid input") }
+    }
+  }
+}

@@ -41,6 +41,9 @@ pub enum Instruction {
         dst: Register,
         string: u16,
     },
+    ConstNull {
+        dst: Register,
+    },
     Move {
         dst: Register,
         src: Register,
@@ -151,11 +154,22 @@ pub enum Instruction {
         method: u16,
         args: Vec<Register>,
     },
+    InvokeInterface {
+        method: u16,
+        args: Vec<Register>,
+    },
     MoveResult {
         dst: Register,
     },
     MoveResultObject {
         dst: Register,
+    },
+    MoveResultWide {
+        dst: u8,
+    },
+    LongToInt {
+        dst: Register,
+        src: u8,
     },
     Goto16 {
         target: Label,
@@ -177,6 +191,9 @@ fn width(instruction: &Instruction) -> u32 {
         | Instruction::MoveObject { .. }
         | Instruction::MoveResult { .. }
         | Instruction::MoveResultObject { .. }
+        | Instruction::MoveResultWide { .. }
+        | Instruction::LongToInt { .. }
+        | Instruction::ConstNull { .. }
         | Instruction::AddInt2Addr { .. }
         | Instruction::Return { .. }
         | Instruction::ReturnObject { .. }
@@ -185,7 +202,8 @@ fn width(instruction: &Instruction) -> u32 {
         | Instruction::InvokeStatic { .. }
         | Instruction::InvokeVirtual { .. }
         | Instruction::InvokeSuper { .. }
-        | Instruction::InvokeDirect { .. } => 3,
+        | Instruction::InvokeDirect { .. }
+        | Instruction::InvokeInterface { .. } => 3,
         _ => 2,
     }
 }
@@ -270,6 +288,12 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
             }
             Instruction::ConstString { dst, string } => {
                 output.extend([0x1a | u16::from(reference(*dst)?) << 8, *string])
+            }
+            Instruction::ConstNull { dst } => {
+                if dst.kind != ValueKind::Reference || dst.index > 15 {
+                    return Err(DexError::InvalidInput("invalid null register"));
+                }
+                output.push(0x12 | u16::from(dst.index) << 8)
             }
             Instruction::Move { dst, src } => {
                 output.push(0x01 | u16::from(integer(*dst)?) << 8 | u16::from(integer(*src)?) << 12)
@@ -385,7 +409,8 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
             Instruction::InvokeStatic { method, args }
             | Instruction::InvokeVirtual { method, args }
             | Instruction::InvokeSuper { method, args }
-            | Instruction::InvokeDirect { method, args } => {
+            | Instruction::InvokeDirect { method, args }
+            | Instruction::InvokeInterface { method, args } => {
                 if args.len() > 5 {
                     return Err(DexError::InvalidInput(
                         "invoke-static exceeds five arguments",
@@ -402,6 +427,7 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
                     Instruction::InvokeVirtual { .. } => 0x6e,
                     Instruction::InvokeSuper { .. } => 0x6f,
                     Instruction::InvokeDirect { .. } => 0x70,
+                    Instruction::InvokeInterface { .. } => 0x72,
                     _ => 0x71,
                 };
                 output.extend([
@@ -413,6 +439,18 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
             Instruction::MoveResult { dst } => output.push(0x0a | u16::from(integer(*dst)?) << 8),
             Instruction::MoveResultObject { dst } => {
                 output.push(0x0c | u16::from(reference(*dst)?) << 8)
+            }
+            Instruction::MoveResultWide { dst } => {
+                if *dst > 14 {
+                    return Err(DexError::InvalidInput("wide result register exceeds 14"));
+                }
+                output.push(0x0b | u16::from(*dst) << 8)
+            }
+            Instruction::LongToInt { dst, src } => {
+                if *src > 14 {
+                    return Err(DexError::InvalidInput("wide source register exceeds 14"));
+                }
+                output.push(0x84 | u16::from(integer(*dst)?) << 8 | u16::from(*src) << 12)
             }
             Instruction::Goto16 { target } => {
                 output.extend([0x29, branch(&labels, *target, cursor)?])

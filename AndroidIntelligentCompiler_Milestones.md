@@ -32,7 +32,10 @@ AI output is always untrusted input. It may propose AIC IR, but parsing, validat
 | M6 | Android host application | M1-M5 compiler stability | Build-to-install flow runs on-device |
 | M7 | AI integration | M2 compiler contract; preferably M6 | Prompt-to-APK and prompt-based edits succeed |
 | M8 | Toolchain independence | M6 | Supported APK pipeline is self-contained |
-| M9 | Advanced backends and ecosystem | M5-M8 | Reproducible production-grade supported subset |
+| M9 | Production UI and navigation profile | M8 | Adaptive multi-screen application corpus passes |
+| M10 | Platform services, data, and runtime | M9 | Connected/offline application corpus passes |
+| M11 | Specialized local AI with Soup | Stable M9-M10 capability contracts | Held-out AIC model evaluation passes |
+| M12 | Production hardening, backends, and ecosystem | M8-M11 | Reproducible distribution-ready supported subset |
 
 The sequence is intentionally gated. Work from a later milestone may be researched early, but it must not expand the implementation scope of the active milestone.
 
@@ -160,6 +163,8 @@ Exit gate: Counter and calculator applications pass repeatable device smoke test
 
 ### M4 - Persistence and Platform Capabilities
 
+Status: **Complete (2026-09-06)**. Closure evidence is recorded in `compiler/docs/m4-acceptance-evidence.md`.
+
 Objective: Generate a useful offline CRUD application with persistent state and explicitly governed Android capabilities.
 
 Scope:
@@ -182,6 +187,8 @@ Acceptance criteria:
 Exit gate: The reference offline CRUD app passes persistence, relaunch, and permission tests on the reference device.
 
 ### M5 - Whole-Program Optimization
+
+Status: **Complete (2026-09-06)**. Closure evidence is recorded in `compiler/docs/m5-acceptance-evidence.md`.
 
 Objective: Reduce generated application cost without changing observable behavior.
 
@@ -206,6 +213,8 @@ Exit gate: A repeatable benchmark report demonstrates improvement over unoptimiz
 
 ### M6 - Android Host Application
 
+Status: **Complete (2026-09-07)**. Closure evidence is recorded in `compiler/docs/m6-acceptance-evidence.md`.
+
 Objective: Run the compiler, package builder, and user-approved installation workflow on an Android device.
 
 Scope:
@@ -228,6 +237,8 @@ Acceptance criteria:
 Exit gate: The full compile, package, install, and launch workflow succeeds on the reference Android device.
 
 ### M7 - AI Integration
+
+Status: **Complete (2026-09-07)**. On the ARM64 reference device, Ollama produced a counter through the reviewed prompt-to-APK flow and completed representative title, control, persistence, and layout edits under deterministic compiler authority; see `compiler/docs/m7-acceptance-evidence.md`.
 
 Objective: Translate natural-language intent into valid AIC IR and support constrained iterative modifications.
 
@@ -253,6 +264,8 @@ Exit gate: Prompt-to-APK and iterative modification scenarios pass an agreed eva
 
 ### M8 - Toolchain Independence
 
+Status: **Implementation available; acceptance in progress (2026-09-07)**. The binary manifest/direct APK path and host bootstrap removal are implemented. Full API 23-36 generated-app and ARM64 API 30-36 host runtime coverage remains an open exit gate; see `compiler/docs/m8-acceptance-evidence.md`.
+
 Objective: Make the supported on-device production pipeline self-contained within AIC.
 
 Scope:
@@ -273,46 +286,126 @@ Acceptance criteria:
 
 Exit gate: The supported AIC feature subset compiles, packages, signs, installs, and launches entirely through the self-contained on-device pipeline.
 
-### M9 - Advanced Backends and Ecosystem
+### M9 - Production UI and Navigation Profile
 
-Objective: Mature the supported subset into a reproducible, governed, production-grade toolchain.
+Objective: Expand AIC from the initial linear-layout profile into a practical, versioned Android UI and navigation language.
+
+Scope:
+
+- Publish a machine-readable capability catalog consumed by the compiler, host, AI prompt layer, documentation, and evaluation tools.
+- Version the expanded IR and provide deterministic migration from AIC IR 0.1 projects.
+- Add nested layout composition with gravity/alignment, padding, margins, visibility, enabled state, stable dimensions, and adaptive sizing.
+- Add production UI primitives in bounded groups: images/icons, lists with reusable rows, menus, dialogs, progress indicators, and common input controls.
+- Add multiple screens and explicit navigation, back behavior, activity finish, lifecycle-safe state restoration, and result passing.
+- Add resources, themes, localization, accessibility semantics, density handling, and orientation/window-size adaptation.
+- Keep every framework operation behind typed verifier and lowering contracts; do not expose arbitrary reflection or unrestricted method invocation.
+
+Acceptance criteria:
+
+1. Every new UI/lifecycle operation has syntax/schema, type and capability validation, deterministic DEX lowering, invalid fixtures, and a runnable device example.
+1. The capability catalog can explain before generation whether a requested UI or lifecycle behavior is supported and which capability is missing.
+1. Migrated IR 0.1 projects produce behavior equivalent to their original builds.
+1. Reference applications cover toolbar actions, multi-screen navigation, lists, dialogs, images, accessibility, localization, and state restoration.
+1. Layout tests pass across declared screen sizes, densities, orientation changes, font scaling, and supported Android versions.
+1. Unsupported layout or lifecycle requests fail with actionable diagnostics and leave the project unchanged.
+
+Exit gate: AIC can build and run the declared production UI/navigation corpus without Java/Kotlin generated-app compilation, with accessibility and compatibility evidence.
+
+### M10 - Platform Services, Data, and Application Runtime
+
+Objective: Add the platform capabilities required by useful connected and background-aware Android applications.
+
+Scope:
+
+- Add typed HTTP/TLS operations, structured request/response models, timeouts, cancellation, connectivity errors, and explicit network capability declarations.
+- Add asynchronous tasks with lifecycle-aware result delivery and deterministic restrictions on concurrency and shared state.
+- Expand persistence with transactions, parameterized queries, schema versions, migrations, indexes, and bounded result iteration.
+- Add document/media selection through platform contracts and scoped-storage-safe file operations.
+- Add runtime permission declaration/request/result flows for a reviewed subset of Android capabilities.
+- Add notifications and narrowly scoped scheduled/background work using platform primitives.
+- Define privacy, cleartext-network, exported-component, data-retention, and capability-minimization policies enforced before packaging.
+
+Acceptance criteria:
+
+1. Network, asynchronous, database, file, permission, notification, and background-work operations have typed contracts and deterministic lowering tests.
+1. Cancellation, recreation, offline behavior, denied permissions, malformed responses, storage exhaustion, and migration failures are covered on device.
+1. Generated manifests contain only permissions and components derived from verified capabilities.
+1. TLS is the default; cleartext and externally exposed components require explicit policy-approved declarations.
+1. Reference applications demonstrate connected data, offline persistence, background scheduling, and recovery without lifecycle leaks or crashes.
+1. Static policy checks reject unsafe or undeclared platform access before DEX generation.
+
+Exit gate: The declared connected-application corpus passes functional, lifecycle, privacy, permission, offline, and recovery tests on every supported device profile.
+
+### M11 - Specialized Local AI with Soup
+
+Objective: Train and ship an optional local model specialized for AIC planning, constrained edits, repair, and honest unsupported-intent reporting.
+
+Scope:
+
+- Extend the provider-neutral proposal contract with explicit `create`, `patch`, and `unsupported` outcomes plus referenced capability IDs.
+- Prefer structured semantic edit operations over complete-source rewriting where the compiler owns an equivalent deterministic transformation.
+- Build a versioned dataset from reviewed valid programs, minimal edits, compiler repair traces, unsupported requests, and adversarial negative examples; remove secrets and user content not approved for training.
+- Establish train/validation/held-out prompt splits that prevent template and project leakage.
+- Use a pinned Soup release to run reproducible QLoRA/SFT experiments on a suitable Qwen instruct checkpoint; record base model, tokenizer/chat template, dataset digest, seed, adapter configuration, and hardware.
+- Evaluate retrieval-only, constrained-decoding, base-model, and fine-tuned variants before selecting a model.
+- Merge the accepted adapter, export a quantized GGUF, and serve it locally through llama.cpp and/or Ollama using the existing provider abstraction.
+- Keep compiler validation, capability enforcement, signing, packaging, installation, and launch outside model authority.
+
+Acceptance criteria:
+
+1. Dataset licenses, provenance, redaction, splits, versioning, and reproducible generation are documented and audited.
+1. Held-out evaluation measures schema validity, compile success, semantic task success, minimal-diff behavior, repair convergence, capability citation, and unsupported-intent accuracy.
+1. The specialized model materially improves over the selected base model without regressing safety or unsupported-request handling.
+1. Model quantization preserves the agreed evaluation thresholds and fits the documented local hardware envelope.
+1. Exported GGUF artifacts run through both the Android host provider boundary and at least one supported local server.
+1. Model, adapter, dataset, and evaluation versions are independently selectable; the compiler remains fully usable without them.
+
+Exit gate: A pinned Soup-trained local model passes the held-out AIC evaluation suite and completes the representative prompt-to-APK corpus while correctly declining unsupported requests.
+
+### M12 - Production Hardening, Backends, and Ecosystem
+
+Objective: Mature the expanded supported profile into a reproducible, governed, distribution-ready toolchain.
 
 Scope:
 
 - Evaluate an optional LLVM/ARM64 backend for measured compute-heavy hotspots.
-- Add AAB/release support only after the APK pipeline is stable.
+- Add AAB/release support only after the APK pipeline and expanded Android profile are stable.
 - Establish a versioned catalog of reusable trusted primitives and capability modules.
-- Implement IR migration and compatibility policies.
-- Define plugin/capability governance and reproducible release builds.
-- Harden signing/key management and review publishing/distribution requirements.
+- Finalize IR migration/compatibility policy across all published versions.
+- Define plugin/capability governance, dependency review, supply-chain metadata, and reproducible release builds.
+- Harden signing/key management and complete publishing/distribution requirements.
+- Run security review, fuzzing, performance, power, accessibility, compatibility, upgrade, rollback, and long-duration reliability gates.
 
 Acceptance criteria:
 
 1. Optional backend selection is based on repeatable profiling and produces equivalent results.
-1. IR versions have documented compatibility and tested migration paths.
+1. Published IR versions have documented compatibility and tested migration paths.
 1. Trusted primitives and capability modules have explicit ownership, security boundaries, and versioning.
-1. Release artifacts are reproducible to the documented limit and include toolchain metadata.
+1. Release artifacts are reproducible to the documented limit and include toolchain, capability, model, and dataset metadata where applicable.
 1. Signing keys are handled through an audited design appropriate to the selected distribution model.
-1. The supported production subset, limitations, and compatibility matrix are published.
+1. The supported production subset, limitations, compatibility matrix, support policy, and update strategy are published.
 
-Exit gate: A declared production-grade subset builds reproducibly and passes compatibility, security, performance, and distribution-readiness reviews.
+Exit gate: A declared production-grade subset builds reproducibly and passes compatibility, security, performance, accessibility, reliability, and distribution-readiness reviews.
 
 ## 6. Cross-Milestone Test Growth
 
 | Test layer | Introduced | Continues through |
 | --- | --- | --- |
-| Pure unit tests for encoding and lowering | M0 | M9 |
-| Golden DEX/APK fixtures | M0 | M9 |
-| Independent structural verification | M0 | M9 |
-| Physical-device install/launch smoke tests | M1 | M9 |
-| Semantic valid/invalid IR fixtures | M2 | M9 |
-| Optimization differential tests | M2 | M9 |
-| Interactive UI tests | M3 | M9 |
-| Persistence and permission tests | M4 | M9 |
-| Size and performance benchmarks | M5 | M9 |
-| On-device workflow tests | M6 | M9 |
-| AI evaluation and repair-loop tests | M7 | M9 |
-| Android/API compatibility corpus | M8 | M9 |
+| Pure unit tests for encoding and lowering | M0 | M12 |
+| Golden DEX/APK fixtures | M0 | M12 |
+| Independent structural verification | M0 | M12 |
+| Physical-device install/launch smoke tests | M1 | M12 |
+| Semantic valid/invalid IR fixtures | M2 | M12 |
+| Optimization differential tests | M2 | M12 |
+| Interactive UI tests | M3 | M12 |
+| Persistence and permission tests | M4 | M12 |
+| Size and performance benchmarks | M5 | M12 |
+| On-device workflow tests | M6 | M12 |
+| AI evaluation and repair-loop tests | M7 | M12 |
+| Android/API compatibility corpus | M8 | M12 |
+| Adaptive UI, navigation, accessibility, and migration tests | M9 | M12 |
+| Network, async, permission, privacy, and recovery tests | M10 | M12 |
+| Model dataset, calibration, quantization, and held-out evaluations | M11 | M12 |
 
 ## 7. Dependencies and Decision Gates
 
@@ -328,7 +421,10 @@ The following decisions must be made before the indicated work begins:
 | First persistence backend | Before M4 | Select platform primitive and document supported semantics |
 | AI provider/model | Before M7 | Select behind provider abstraction; do not embed into compiler core |
 | Supported Android/API compatibility matrix | Before M8 exit | Publish tested profiles and exclusions |
-| Release distribution and key-management model | Before M9 exit | Complete security and policy review |
+| Expanded IR version and UI capability boundary | Before M9 | Approve capability catalog and migration ADR |
+| Platform-service and permission subset | Before M10 | Approve threat model, privacy policy, and Android API list |
+| Soup/base model, dataset license, and training hardware | Before M11 | Record reproducible training and evaluation ADR |
+| Release distribution and key-management model | Before M12 exit | Complete security and policy review |
 
 ## 8. Milestone Tracking Template
 

@@ -1,0 +1,1 @@
+Preferred: Perfetto heapprofd on a supported debuggable reference build. Fallback recorded for this run: dumpsys meminfo -d object and heap counters; allocation total unavailable.

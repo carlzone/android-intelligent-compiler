@@ -1,0 +1,37 @@
+aic_version 0.1
+app "AIC Optimizer" package "dev.aic.generated.optimizer" {
+  capability persistence.key_value
+  preference legacy_flag: bool = false
+
+  fn increment(value: i32) -> i32 {
+    return value + 1
+  }
+  fn next(value: i32) -> i32 {
+    return increment(value)
+  }
+  fn unused_message() -> string {
+    return "unused helper payload" + "unused helper payload"
+  }
+
+  activity MainActivity {
+    state count: i32 = 0
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let output = android.text_view(text: "Count: " + string(count))
+      let increment_button = android.button(text: "Increment")
+      if false {
+        preference.set(legacy_flag, true)
+        android.set_text(view: output, text: "unreachable resource")
+      } else {
+        android.set_text(view: output, text: "Count: " + string(count))
+      }
+      android.add_view(parent: root, child: output)
+      android.add_view(parent: root, child: increment_button)
+      android.set_content_view(root)
+    }
+    on_click(increment_button) {
+      count = next(count)
+      android.set_text(view: output, text: "Count: " + string(count))
+    }
+  }
+}

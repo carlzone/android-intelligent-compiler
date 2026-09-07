@@ -139,6 +139,23 @@ pub enum ExpressionKind {
     AndroidText {
         view: String,
     },
+    PreferenceGet {
+        key: String,
+    },
+    DatabaseInsert {
+        table: String,
+        values: Vec<(String, Expression)>,
+    },
+    DatabaseExists {
+        table: String,
+        id: Box<Expression>,
+    },
+    DatabaseGet {
+        table: String,
+        id: Box<Expression>,
+        column: String,
+        default: Box<Expression>,
+    },
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnaryOp {
@@ -206,6 +223,10 @@ pub enum StatementKind {
         id: String,
         hint: Expression,
     },
+    TextInput {
+        id: String,
+        hint: Expression,
+    },
     ScrollView {
         id: String,
     },
@@ -234,6 +255,62 @@ pub enum StatementKind {
         view: String,
         color: String,
     },
+    PreferenceSet {
+        key: String,
+        value: Expression,
+    },
+    DatabaseUpdate {
+        table: String,
+        id: Expression,
+        values: Vec<(String, Expression)>,
+    },
+    DatabaseDelete {
+        table: String,
+        id: Expression,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum Capability {
+    KeyValue,
+    Sqlite,
+}
+impl Capability {
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::KeyValue => "persistence.key_value",
+            Self::Sqlite => "persistence.sqlite",
+        }
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Preference {
+    pub name: String,
+    pub ty: Type,
+    pub default: Value,
+    pub span: SourceSpan,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Column {
+    pub name: String,
+    pub ty: Type,
+    pub primary_key: bool,
+    pub auto_increment: bool,
+    pub span: SourceSpan,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Table {
+    pub name: String,
+    pub columns: Vec<Column>,
+    pub span: SourceSpan,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Database {
+    pub name: String,
+    pub version: i32,
+    pub tables: Vec<Table>,
+    pub span: SourceSpan,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Orientation {
@@ -284,6 +361,9 @@ pub struct SyntaxProgram {
     pub version: String,
     pub label: String,
     pub package: String,
+    pub capabilities: Vec<(Capability, SourceSpan)>,
+    pub preferences: Vec<Preference>,
+    pub database: Option<Database>,
     pub functions: Vec<SyntaxFunction>,
     pub activity: SyntaxActivity,
 }
@@ -307,6 +387,9 @@ pub struct Program {
     pub version: String,
     pub label: String,
     pub package: String,
+    pub capabilities: BTreeSet<Capability>,
+    pub preferences: Vec<Preference>,
+    pub database: Option<Database>,
     pub functions: Vec<Function>,
     pub activity: Activity,
 }
@@ -596,6 +679,73 @@ impl Parser {
         self.word("package")?;
         let package = self.string()?;
         self.sym("{")?;
+        let mut capabilities = vec![];
+        while matches!(&self.cur().k,K::Word(v)if v=="capability") {
+            let start = self.pop().s.start;
+            self.word("persistence")?;
+            self.sym(".")?;
+            let token = self.pop();
+            let capability = match &token.k {
+                K::Word(v) if v == "key_value" => Capability::KeyValue,
+                K::Word(v) if v == "sqlite" => Capability::Sqlite,
+                K::Word(v) => {
+                    return Err(Diagnostic::at(
+                        "AIC1301",
+                        token.s,
+                        format!("unsupported capability `persistence.{v}`"),
+                    ))
+                }
+                _ => {
+                    return Err(Diagnostic::at(
+                        "AIC1301",
+                        token.s,
+                        "expected persistence capability",
+                    ))
+                }
+            };
+            capabilities.push((
+                capability,
+                SourceSpan {
+                    start,
+                    end: token.s.end,
+                },
+            ));
+        }
+        let mut preferences = vec![];
+        while matches!(&self.cur().k,K::Word(v)if v=="preference") {
+            let start = self.pop().s.start;
+            let (name, _) = self.id()?;
+            self.sym(":")?;
+            let ty = self.ty()?;
+            self.sym("=")?;
+            let token = self.pop();
+            let default = match token.k {
+                K::Int(v) => Value::I32(v),
+                K::Str(v) => Value::String(v),
+                K::Word(v) if v == "true" || v == "false" => Value::Bool(v == "true"),
+                _ => {
+                    return Err(Diagnostic::at(
+                        "AIC1302",
+                        token.s,
+                        "preference default must be a literal",
+                    ))
+                }
+            };
+            preferences.push(Preference {
+                name,
+                ty,
+                default,
+                span: SourceSpan {
+                    start,
+                    end: token.s.end,
+                },
+            });
+        }
+        let database = if matches!(&self.cur().k,K::Word(v)if v=="database") {
+            Some(self.database()?)
+        } else {
+            None
+        };
         let mut functions = vec![];
         while matches!(&self.cur().k,K::Word(v)if v=="fn") {
             functions.push(self.function()?)
@@ -648,6 +798,9 @@ impl Parser {
             version: "0.1".into(),
             label,
             package,
+            capabilities,
+            preferences,
+            database,
             functions,
             activity: SyntaxActivity {
                 name,
@@ -655,6 +808,63 @@ impl Parser {
                 on_create,
                 on_click,
             },
+        })
+    }
+    fn database(&mut self) -> Result<Database, Diagnostic> {
+        let start = self.word("database")?.s.start;
+        let (name, _) = self.id()?;
+        self.word("version")?;
+        let version_token = self.pop();
+        let K::Int(version) = version_token.k else {
+            return Err(Diagnostic::at(
+                "AIC1303",
+                version_token.s,
+                "database version must be 1",
+            ));
+        };
+        self.sym("{")?;
+        let mut tables = vec![];
+        while matches!(&self.cur().k,K::Word(v)if v=="table") {
+            let table_start = self.pop().s.start;
+            let (table_name, _) = self.id()?;
+            self.sym("{")?;
+            let mut columns = vec![];
+            while self.cur().k != K::Sym("}") {
+                let (column_name, span) = self.id()?;
+                self.sym(":")?;
+                let ty = self.ty()?;
+                let primary_key = matches!(&self.cur().k,K::Word(v)if v=="primary_key");
+                if primary_key {
+                    self.pop();
+                }
+                let auto_increment = matches!(&self.cur().k,K::Word(v)if v=="auto_increment");
+                if auto_increment {
+                    self.pop();
+                }
+                columns.push(Column {
+                    name: column_name,
+                    ty,
+                    primary_key,
+                    auto_increment,
+                    span,
+                });
+            }
+            let end = self.sym("}")?.s.end;
+            tables.push(Table {
+                name: table_name,
+                columns,
+                span: SourceSpan {
+                    start: table_start,
+                    end,
+                },
+            });
+        }
+        let end = self.sym("}")?.s.end;
+        Ok(Database {
+            name,
+            version,
+            tables,
+            span: SourceSpan { start, end },
         })
     }
     fn function(&mut self) -> Result<SyntaxFunction, Diagnostic> {
@@ -779,6 +989,14 @@ impl Parser {
                                     hint: self.expr(0)?,
                                 }
                             }
+                            "text_input" => {
+                                self.word("hint")?;
+                                self.sym(":")?;
+                                StatementKind::TextInput {
+                                    id: name,
+                                    hint: self.expr(0)?,
+                                }
+                            }
                             "scroll_view" => StatementKind::ScrollView { id: name },
                             _ => {
                                 return Err(Diagnostic::at(
@@ -846,6 +1064,8 @@ impl Parser {
                 }
             }
             K::Word(v) if v == "android" => self.android()?,
+            K::Word(v) if v == "preference" => self.preference_statement()?,
+            K::Word(v) if v == "database" => self.database_statement()?,
             K::Word(_) => {
                 let (name, _) = self.id()?;
                 self.sym("=")?;
@@ -869,6 +1089,56 @@ impl Parser {
                 end: self.t[self.i - 1].s.end,
             },
         })
+    }
+    fn preference_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.word("preference")?;
+        self.sym(".")?;
+        self.word("set")?;
+        self.sym("(")?;
+        let (key, _) = self.id()?;
+        self.sym(",")?;
+        let value = self.expr(0)?;
+        self.sym(")")?;
+        Ok(StatementKind::PreferenceSet { key, value })
+    }
+    fn database_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.word("database")?;
+        self.sym(".")?;
+        let (operation, span) = self.id()?;
+        self.sym("(")?;
+        let (table, _) = self.id()?;
+        self.sym(",")?;
+        let id = self.expr(0)?;
+        let result = match operation.as_str() {
+            "delete" => StatementKind::DatabaseDelete { table, id },
+            "update" => {
+                self.sym(",")?;
+                let values = self.named_values()?;
+                StatementKind::DatabaseUpdate { table, id, values }
+            }
+            _ => {
+                return Err(Diagnostic::at(
+                    "AIC1304",
+                    span,
+                    "unsupported database statement",
+                ))
+            }
+        };
+        self.sym(")")?;
+        Ok(result)
+    }
+    fn named_values(&mut self) -> Result<Vec<(String, Expression)>, Diagnostic> {
+        let mut values = vec![];
+        loop {
+            let (name, _) = self.id()?;
+            self.sym(":")?;
+            values.push((name, self.expr(0)?));
+            if self.cur().k != K::Sym(",") {
+                break;
+            }
+            self.pop();
+        }
+        Ok(values)
     }
     fn android(&mut self) -> Result<StatementKind, Diagnostic> {
         self.word("android")?;
@@ -1049,6 +1319,65 @@ impl Parser {
                     },
                 })
             }
+            K::Word(n) if (n == "preference" || n == "database") && self.cur().k == K::Sym(".") => {
+                self.pop();
+                let (operation, span) = self.id()?;
+                self.sym("(")?;
+                let kind = if n == "preference" && operation == "get" {
+                    let (key, _) = self.id()?;
+                    ExpressionKind::PreferenceGet { key }
+                } else if n == "database" {
+                    let (table, _) = self.id()?;
+                    match operation.as_str() {
+                        "insert" => {
+                            self.sym(",")?;
+                            ExpressionKind::DatabaseInsert {
+                                table,
+                                values: self.named_values()?,
+                            }
+                        }
+                        "exists" => {
+                            self.sym(",")?;
+                            ExpressionKind::DatabaseExists {
+                                table,
+                                id: Box::new(self.expr(0)?),
+                            }
+                        }
+                        "get" => {
+                            self.sym(",")?;
+                            let id = Box::new(self.expr(0)?);
+                            self.sym(",")?;
+                            let (column, _) = self.id()?;
+                            self.sym(",")?;
+                            let default = Box::new(self.expr(0)?);
+                            ExpressionKind::DatabaseGet {
+                                table,
+                                id,
+                                column,
+                                default,
+                            }
+                        }
+                        _ => {
+                            return Err(Diagnostic::at(
+                                "AIC1305",
+                                span,
+                                "unsupported database expression",
+                            ))
+                        }
+                    }
+                } else {
+                    return Err(Diagnostic::at(
+                        "AIC1306",
+                        span,
+                        "unsupported preference expression",
+                    ));
+                };
+                let end = self.sym(")")?.s.end;
+                Ok(Expression {
+                    kind,
+                    span: SourceSpan { start: st, end },
+                })
+            }
             K::Word(n) => {
                 if self.cur().k == K::Sym("(") {
                     self.pop();
@@ -1115,6 +1444,11 @@ fn keyword(v: &str) -> bool {
             | "on_create"
             | "on_click"
             | "state"
+            | "capability"
+            | "preference"
+            | "database"
+            | "version"
+            | "table"
             | "let"
             | "var"
             | "return"
@@ -1170,6 +1504,9 @@ struct Check {
     ret: Option<Type>,
     caller: String,
     calls: BTreeMap<String, BTreeSet<String>>,
+    preferences: BTreeMap<String, Type>,
+    tables: BTreeMap<String, BTreeMap<String, Column>>,
+    used_capabilities: BTreeSet<Capability>,
 }
 pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
     if s.package.split('.').count() < 2
@@ -1241,6 +1578,87 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
             "ScrollView must contain exactly one child",
         ));
     }
+    let mut declared_capabilities = BTreeSet::new();
+    for (capability, span) in &s.capabilities {
+        if !declared_capabilities.insert(*capability) {
+            return Err(Diagnostic::at(
+                "AIC1307",
+                *span,
+                format!("duplicate capability `{}`", capability.name()),
+            ));
+        }
+    }
+    let mut preferences = BTreeMap::new();
+    for preference in &s.preferences {
+        req(preference.ty, preference.default.ty(), preference.span)?;
+        if preferences
+            .insert(preference.name.clone(), preference.ty)
+            .is_some()
+        {
+            return Err(Diagnostic::at(
+                "AIC1308",
+                preference.span,
+                "duplicate preference key",
+            ));
+        }
+    }
+    let mut tables = BTreeMap::new();
+    if let Some(database) = &s.database {
+        if database.version != 1 {
+            return Err(Diagnostic::at(
+                "AIC1309",
+                database.span,
+                "only database version 1 is supported",
+            ));
+        }
+        for table in &database.tables {
+            let mut columns = BTreeMap::new();
+            let mut primary_keys = 0;
+            for column in &table.columns {
+                if column.primary_key {
+                    primary_keys += 1;
+                    if column.ty != Type::I32 || !column.auto_increment {
+                        return Err(Diagnostic::at(
+                            "AIC1310",
+                            column.span,
+                            "primary key must be i32 primary_key auto_increment",
+                        ));
+                    }
+                }
+                if column.auto_increment && !column.primary_key {
+                    return Err(Diagnostic::at(
+                        "AIC1311",
+                        column.span,
+                        "auto_increment requires primary_key",
+                    ));
+                }
+                if columns
+                    .insert(column.name.clone(), column.clone())
+                    .is_some()
+                {
+                    return Err(Diagnostic::at(
+                        "AIC1312",
+                        column.span,
+                        "duplicate database column",
+                    ));
+                }
+            }
+            if primary_keys != 1 {
+                return Err(Diagnostic::at(
+                    "AIC1313",
+                    table.span,
+                    "table requires exactly one primary key",
+                ));
+            }
+            if tables.insert(table.name.clone(), columns).is_some() {
+                return Err(Diagnostic::at(
+                    "AIC1314",
+                    table.span,
+                    "duplicate database table",
+                ));
+            }
+        }
+    }
     let mut sig = BTreeMap::new();
     for f in &s.functions {
         if sig
@@ -1264,6 +1682,9 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
             ret: Some(f.return_type),
             caller: f.name.clone(),
             calls: BTreeMap::new(),
+            preferences: preferences.clone(),
+            tables: tables.clone(),
+            used_capabilities: BTreeSet::new(),
         };
         let mut env = BTreeMap::new();
         for p in &f.params {
@@ -1297,6 +1718,9 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
         ret: None,
         caller: "<on_create>".into(),
         calls: BTreeMap::new(),
+        preferences: preferences.clone(),
+        tables: tables.clone(),
+        used_capabilities: BTreeSet::new(),
     };
     let mut activity_env = BTreeMap::new();
     for state in &s.activity.state {
@@ -1348,11 +1772,34 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
         }
         c.stmts(&handler.body, &mut activity_env.clone())?;
     }
+    let used = c.used_capabilities.clone();
+    for capability in &used {
+        if !declared_capabilities.contains(capability) {
+            return Err(Diagnostic::global(
+                "AIC1315",
+                format!(
+                    "capability `{}` is used but not declared",
+                    capability.name()
+                ),
+            ));
+        }
+    }
+    for capability in &declared_capabilities {
+        if !used.contains(capability) {
+            return Err(Diagnostic::global(
+                "AIC1316",
+                format!("declared capability `{}` is unused", capability.name()),
+            ));
+        }
+    }
     cycles(&graph)?;
     Ok(Program {
         version: s.version,
         label: s.label,
         package: s.package,
+        capabilities: declared_capabilities,
+        preferences: s.preferences,
+        database: s.database,
         functions: s
             .functions
             .into_iter()
@@ -1489,6 +1936,7 @@ impl Check {
             | StatementKind::TextView { id, .. }
             | StatementKind::Button { id, .. }
             | StatementKind::EditText { id, .. }
+            | StatementKind::TextInput { id, .. }
             | StatementKind::ScrollView { id } => {
                 if e.insert(
                     id.clone(),
@@ -1504,7 +1952,8 @@ impl Check {
                 }
                 if let StatementKind::TextView { text, .. }
                 | StatementKind::Button { text, .. }
-                | StatementKind::EditText { hint: text, .. } = &s.kind
+                | StatementKind::EditText { hint: text, .. }
+                | StatementKind::TextInput { hint: text, .. } = &s.kind
                 {
                     let a = self.expr(text, e)?;
                     req(Type::String, a, text.span)?
@@ -1527,6 +1976,30 @@ impl Check {
                 view(e, v, s.span)?;
                 let actual = self.expr(text, e)?;
                 req(Type::String, actual, text.span)?;
+                Ok(false)
+            }
+            StatementKind::PreferenceSet { key, value } => {
+                if self.ret.is_some() {
+                    return Err(Diagnostic::at(
+                        "AIC1317",
+                        s.span,
+                        "persistence is activity-only",
+                    ));
+                }
+                let expected = *self.preferences.get(key).ok_or_else(|| {
+                    Diagnostic::at("AIC1318", s.span, format!("unknown preference key `{key}`"))
+                })?;
+                let actual = self.expr(value, e)?;
+                req(expected, actual, value.span)?;
+                self.used_capabilities.insert(Capability::KeyValue);
+                Ok(false)
+            }
+            StatementKind::DatabaseUpdate { table, id, values } => {
+                self.verify_database_write(table, Some(id), values, e, s.span)?;
+                Ok(false)
+            }
+            StatementKind::DatabaseDelete { table, id } => {
+                self.verify_database_write(table, Some(id), &[], e, s.span)?;
                 Ok(false)
             }
         }
@@ -1648,7 +2121,128 @@ impl Check {
                 view(e, name, x.span)?;
                 Ok(Type::String)
             }
+            ExpressionKind::PreferenceGet { key } => {
+                if self.ret.is_some() {
+                    return Err(Diagnostic::at(
+                        "AIC1317",
+                        x.span,
+                        "persistence is activity-only",
+                    ));
+                }
+                let ty = *self.preferences.get(key).ok_or_else(|| {
+                    Diagnostic::at("AIC1318", x.span, format!("unknown preference key `{key}`"))
+                })?;
+                self.used_capabilities.insert(Capability::KeyValue);
+                Ok(ty)
+            }
+            ExpressionKind::DatabaseInsert { table, values } => {
+                self.verify_database_write(table, None, values, e, x.span)?;
+                Ok(Type::I32)
+            }
+            ExpressionKind::DatabaseExists { table, id } => {
+                self.verify_database_read(table, id, e, x.span)?;
+                Ok(Type::Bool)
+            }
+            ExpressionKind::DatabaseGet {
+                table,
+                id,
+                column,
+                default,
+            } => {
+                let columns = self.verify_database_read(table, id, e, x.span)?;
+                let ty = columns
+                    .get(column)
+                    .ok_or_else(|| {
+                        Diagnostic::at("AIC1319", x.span, format!("unknown column `{column}`"))
+                    })?
+                    .ty;
+                let actual = self.expr(default, e)?;
+                req(ty, actual, default.span)?;
+                Ok(ty)
+            }
         }
+    }
+    fn verify_database_read(
+        &mut self,
+        table: &str,
+        id: &Expression,
+        e: &BTreeMap<String, Binding>,
+        span: SourceSpan,
+    ) -> Result<BTreeMap<String, Column>, Diagnostic> {
+        if self.ret.is_some() {
+            return Err(Diagnostic::at(
+                "AIC1317",
+                span,
+                "persistence is activity-only",
+            ));
+        }
+        let columns =
+            self.tables.get(table).cloned().ok_or_else(|| {
+                Diagnostic::at("AIC1320", span, format!("unknown table `{table}`"))
+            })?;
+        let actual = self.expr(id, e)?;
+        req(Type::I32, actual, id.span)?;
+        self.used_capabilities.insert(Capability::Sqlite);
+        Ok(columns)
+    }
+    fn verify_database_write(
+        &mut self,
+        table: &str,
+        id: Option<&Expression>,
+        values: &[(String, Expression)],
+        e: &BTreeMap<String, Binding>,
+        span: SourceSpan,
+    ) -> Result<(), Diagnostic> {
+        let columns = if let Some(id) = id {
+            self.verify_database_read(table, id, e, span)?
+        } else {
+            if self.ret.is_some() {
+                return Err(Diagnostic::at(
+                    "AIC1317",
+                    span,
+                    "persistence is activity-only",
+                ));
+            }
+            self.used_capabilities.insert(Capability::Sqlite);
+            self.tables.get(table).cloned().ok_or_else(|| {
+                Diagnostic::at("AIC1320", span, format!("unknown table `{table}`"))
+            })?
+        };
+        let mut seen = BTreeSet::new();
+        for (name, value) in values {
+            let column = columns.get(name).ok_or_else(|| {
+                Diagnostic::at("AIC1319", value.span, format!("unknown column `{name}`"))
+            })?;
+            if column.primary_key {
+                return Err(Diagnostic::at(
+                    "AIC1321",
+                    value.span,
+                    "primary key cannot be written",
+                ));
+            }
+            if !seen.insert(name) {
+                return Err(Diagnostic::at(
+                    "AIC1322",
+                    value.span,
+                    "duplicate query column",
+                ));
+            }
+            let actual = self.expr(value, e)?;
+            req(column.ty, actual, value.span)?;
+        }
+        if id.is_none()
+            && columns
+                .values()
+                .filter(|column| !column.primary_key)
+                .any(|column| !seen.contains(&column.name))
+        {
+            return Err(Diagnostic::at(
+                "AIC1323",
+                span,
+                "insert must provide every non-primary column",
+            ));
+        }
+        Ok(())
     }
 }
 fn req(a: Type, b: Type, s: SourceSpan) -> Result<(), Diagnostic> {
@@ -1772,7 +2366,11 @@ fn eval(x: &Expression, e: &BTreeMap<String, Value>, p: &Program) -> Result<Valu
             run(&f.body, &mut q, p)?
                 .ok_or_else(|| Diagnostic::at("AIC1104", f.span, "missing return"))
         }
-        ExpressionKind::AndroidText { .. } => Err(Diagnostic::at(
+        ExpressionKind::AndroidText { .. }
+        | ExpressionKind::PreferenceGet { .. }
+        | ExpressionKind::DatabaseInsert { .. }
+        | ExpressionKind::DatabaseExists { .. }
+        | ExpressionKind::DatabaseGet { .. } => Err(Diagnostic::at(
             "AIC1129",
             x.span,
             "UI text is available only at runtime",
@@ -1962,5 +2560,39 @@ mod tests {
                 .unwrap_err().code,
             "AIC1131"
         );
+    }
+    #[test]
+    fn m4_typed_persistence_verifies() {
+        let program = parse_program(include_str!("../../../testdata/notes.aic")).unwrap();
+        assert_eq!(program.capabilities.len(), 2);
+        assert_eq!(program.preferences[0].name, "last_note_id");
+        assert_eq!(program.database.as_ref().unwrap().tables[0].name, "notes");
+    }
+    #[test]
+    fn m4_rejects_capability_and_schema_errors() {
+        let source = include_str!("../../../testdata/notes.aic");
+        let undeclared = source.replace("  capability persistence.sqlite\n", "");
+        assert_eq!(parse_program(&undeclared).unwrap_err().code, "AIC1315");
+        let unused = source.replace(
+            "  capability persistence.sqlite\n",
+            "  capability persistence.sqlite\n  capability persistence.sqlite\n",
+        );
+        assert_eq!(parse_program(&unused).unwrap_err().code, "AIC1307");
+        let unused = M1.replace("{ activity", "{ capability persistence.key_value activity");
+        assert_eq!(parse_program(&unused).unwrap_err().code, "AIC1316");
+        let unsupported = M1.replace("{ activity", "{ capability persistence.camera activity");
+        assert_eq!(parse_program(&unsupported).unwrap_err().code, "AIC1301");
+        let bad_version = source.replace("version 1", "version 2");
+        assert_eq!(parse_program(&bad_version).unwrap_err().code, "AIC1309");
+        let unknown_column = source.replace(
+            "title: title_text, body: body_text)",
+            "missing: title_text, body: body_text)",
+        );
+        assert_eq!(parse_program(&unknown_column).unwrap_err().code, "AIC1319");
+        let mismatch = source.replace(
+            "preference.set(last_note_id, note_id)",
+            "preference.set(last_note_id, title_text)",
+        );
+        assert_eq!(parse_program(&mismatch).unwrap_err().code, "AIC1116");
     }
 }

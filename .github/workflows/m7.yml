@@ -1,0 +1,42 @@
+name: M7 AI host
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-host:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+          components: clippy, rustfmt
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned Android tools
+        shell: pwsh
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.1.12297006'
+      - name: Rust regression checks
+        shell: pwsh
+        run: |
+          cargo fmt --manifest-path compiler/Cargo.toml --all --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --manifest-path compiler/Cargo.toml --workspace --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo clippy --manifest-path compiler/Cargo.toml --workspace --all-targets --locked -- -D warnings
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build M7 host, tests, and schema contracts
+        shell: pwsh
+        run: ./compiler/scripts/build-m7.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m7-host-debug
+          path: |
+            host/app/build/outputs/apk/debug/app-debug.apk
+            host/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            host/app/build/reports/
+            compiler/schema/

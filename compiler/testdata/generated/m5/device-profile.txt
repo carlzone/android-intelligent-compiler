@@ -1,0 +1,6 @@
+serial=e56c4a46
+model=2312DRA50G
+abi=arm64-v8a
+android=16
+fingerprint=Redmi/garnet_global/garnet:16/BP2A.250605.031.A3/OS3.0.4.0.WNRMIXM:user/release-keys
+samples=10

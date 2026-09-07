@@ -1,0 +1,18 @@
+[package]
+name = "aic-jni"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aic-build = { path = "../aic-build" }
+aic-opt = { path = "../aic-opt" }
+jni = "=0.21.1"
+serde_json = "=1.0.143"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"

@@ -1,0 +1,21 @@
+(* AIC IR 0.1. The Rust parser and verifier remain authoritative. *)
+program       = "aic_version", "0.1", "app", string, "package", string, "{", { app-member }, "}" ;
+app-member    = capability | preference | database | function | activity ;
+capability    = "capability", ("persistence.key_value" | "persistence.sqlite") ;
+preference    = "preference", identifier, ":", type, "=", literal ;
+database      = "database", identifier, "version", integer, "{", { table }, "}" ;
+table         = "table", identifier, "{", { identifier, ":", type, ["primary_key"], ["auto_increment"] }, "}" ;
+function      = "fn", identifier, "(", [parameters], ")", ["->", type], block ;
+activity      = "activity", "MainActivity", "{", { state | on-create | on-click }, "}" ;
+state         = "state", identifier, ":", type, "=", literal ;
+on-create     = "on_create", block ;
+on-click      = "on_click", "(", identifier, ")", block ;
+block         = "{", { statement }, "}" ;
+type          = "i32" | "bool" | "string" ;
+literal       = integer | string | "true" | "false" ;
+
+(* Statements and expressions use only parser-recognized control flow, typed
+   operators, functions, Android calls, preference calls, and database calls.
+   Unknown words and calls are rejected. The complete closed call vocabulary is
+   published in host/app/src/main/assets/ai/aic-ir-0.1.md and executable parser
+   tests. *)

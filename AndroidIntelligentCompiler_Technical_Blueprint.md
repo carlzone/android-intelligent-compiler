@@ -353,14 +353,40 @@ Goal: install and launch an APK generated without Java/Kotlin source or Gradle f
 - Keep compatibility test corpus against Android releases/API profiles.
 > Milestone M8: generated app production pipeline is self-contained inside AIC for the supported feature subset.
 
-## Phase 9 - Advanced Backends and Ecosystem
+## Phase 9 - Production UI and Navigation Profile
 
-- Optional LLVM/ARM64 backend for measured compute-heavy hotspots.
-- AAB/release pipeline only after APK compiler is stable.
-- Reusable trusted primitive catalog and capability modules.
-- IR migration/versioning, plugin/capability governance, reproducible builds.
-- Publishing/distribution policy review and hardened signing/key management.
-> Milestone M9: AIC supports production-grade subsets with reproducible, optimized builds.
+- Publish a machine-readable capability catalog shared by compiler validation, host UX, AI planning, documentation, and evaluation.
+- Version and migrate the IR before broadening it beyond the 0.1 linear-layout subset.
+- Add typed layout composition, alignment/gravity, spacing, visibility/state, adaptive dimensions, lists, images, dialogs, menus, and common controls.
+- Add multiple screens, explicit navigation/back/finish operations, lifecycle-safe restoration, resources, themes, localization, and accessibility semantics.
+- Require parser/schema, verifier, lowering, invalid fixtures, device tests, and compatibility evidence for every operation.
+> Milestone M9: AIC supports a declared production UI/navigation corpus across the supported device matrix.
+
+## Phase 10 - Platform Services, Data, and Application Runtime
+
+- Typed HTTP/TLS and structured data exchange with cancellation and offline errors.
+- Lifecycle-aware asynchronous work with deterministic concurrency restrictions.
+- Transactional/versioned persistence and migration, scoped files/document contracts, runtime permissions, notifications, and scheduled work.
+- Compiler-enforced privacy, exported-component, cleartext-network, data-retention, and least-capability policies.
+> Milestone M10: AIC supports a declared connected-application corpus with permission, privacy, lifecycle, offline, and recovery evidence.
+
+## Phase 11 - Specialized Local AI with Soup
+
+- Add explicit supported/unsupported planning and capability IDs to the provider-neutral model contract.
+- Prefer compiler-owned semantic edit operations over unconstrained complete-source rewriting.
+- Build licensed, versioned SFT/preference/evaluation data from valid programs, repairs, minimal edits, and unsupported/adversarial requests.
+- Use a pinned Soup release for reproducible QLoRA/SFT experiments on a selected Qwen instruct model.
+- Compare base, retrieval, constrained-decoding, and fine-tuned systems on held-out schema, compile, behavior, minimal-diff, repair, and refusal metrics.
+- Merge and export the accepted model as quantized GGUF for local llama.cpp/Ollama serving while retaining deterministic compiler authority.
+> Milestone M11: the specialized local model passes the held-out AIC suite and representative prompt-to-APK scenarios, including honest unsupported responses.
+
+## Phase 12 - Production Hardening, Backends, and Ecosystem
+
+- Optional LLVM/ARM64 backend only for measured compute-heavy hotspots.
+- AAB/release pipeline after the APK compiler and expanded application profile are stable.
+- Reusable trusted primitive catalog, governed capability modules, IR compatibility, reproducible builds, and supply-chain metadata.
+- Publishing/distribution review, hardened signing/key management, fuzzing, security, accessibility, performance, power, upgrade, and reliability gates.
+> Milestone M12: AIC supports a governed production-grade subset with reproducible, optimized, distribution-ready builds.
 
 # 11. Detailed First Three Milestones for Codex
 

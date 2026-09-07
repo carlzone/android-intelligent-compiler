@@ -1,0 +1,4 @@
+AIC 0.8.0: embedded Rust DEX, binary XML and aligned APK assembly
+Profile android-35: DEX 035, minSdk 23, targetSdk 35
+AOSP apksig 8.10.1: in-process v1/v2 signing with Android Keystore
+No bundled AAPT2 executable or Android SDK resource archive.

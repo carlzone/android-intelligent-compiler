@@ -7,6 +7,8 @@ license.workspace = true
 [dependencies]
 aic-ir = { path = "../aic-ir" }
 
+[dev-dependencies]
+aic-opt = { path = "../aic-opt" }
+
 [lints]
 workspace = true
-

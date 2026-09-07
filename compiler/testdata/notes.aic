@@ -1,0 +1,81 @@
+aic_version 0.1
+app "AIC Notes" package "dev.aic.generated.notes" {
+  capability persistence.key_value
+  capability persistence.sqlite
+  preference last_note_id: i32 = 0
+  database notes_store version 1 {
+    table notes {
+      id: i32 primary_key auto_increment
+      title: string
+      body: string
+    }
+  }
+  activity MainActivity {
+    on_create {
+      let scroll = android.scroll_view()
+      let root = android.linear_layout(orientation: vertical)
+      let id_input = android.edit_text(hint: "Note ID")
+      android.set_text(view: id_input, text: string(preference.get(last_note_id)))
+      let title_input = android.text_input(hint: "Title")
+      let body_input = android.text_input(hint: "Body")
+      let status = android.text_view(text: "Ready")
+      let create = android.button(text: "Create")
+      let read = android.button(text: "Read")
+      let update = android.button(text: "Update")
+      let delete = android.button(text: "Delete")
+      android.add_view(parent: root, child: id_input)
+      android.add_view(parent: root, child: title_input)
+      android.add_view(parent: root, child: body_input)
+      android.add_view(parent: root, child: status)
+      android.add_view(parent: root, child: create)
+      android.add_view(parent: root, child: read)
+      android.add_view(parent: root, child: update)
+      android.add_view(parent: root, child: delete)
+      android.add_view(parent: scroll, child: root)
+      android.set_content_view(scroll)
+    }
+    on_click(create) {
+      let title_text: string = android.get_text(title_input)
+      let body_text: string = android.get_text(body_input)
+      let note_id: i32 = database.insert(notes, title: title_text, body: body_text)
+      preference.set(last_note_id, note_id)
+      android.set_text(view: id_input, text: string(note_id))
+      android.set_text(view: status, text: "Created")
+    }
+    on_click(read) {
+      let id_text: string = android.get_text(id_input)
+      if valid_i32(id_text) {
+        let note_id: i32 = i32(id_text)
+        if database.exists(notes, note_id) {
+          android.set_text(view: title_input, text: database.get(notes, note_id, title, ""))
+          android.set_text(view: body_input, text: database.get(notes, note_id, body, ""))
+          preference.set(last_note_id, note_id)
+          android.set_text(view: status, text: "Found")
+        } else { android.set_text(view: status, text: "Not found") }
+      } else { android.set_text(view: status, text: "Invalid ID") }
+    }
+    on_click(update) {
+      let id_text: string = android.get_text(id_input)
+      if valid_i32(id_text) {
+        let note_id: i32 = i32(id_text)
+        if database.exists(notes, note_id) {
+          let title_text: string = android.get_text(title_input)
+          let body_text: string = android.get_text(body_input)
+          database.update(notes, note_id, title: title_text, body: body_text)
+          preference.set(last_note_id, note_id)
+          android.set_text(view: status, text: "Updated")
+        } else { android.set_text(view: status, text: "Not found") }
+      } else { android.set_text(view: status, text: "Invalid ID") }
+    }
+    on_click(delete) {
+      let id_text: string = android.get_text(id_input)
+      if valid_i32(id_text) {
+        let note_id: i32 = i32(id_text)
+        if database.exists(notes, note_id) {
+          database.delete(notes, note_id)
+          android.set_text(view: status, text: "Deleted")
+        } else { android.set_text(view: status, text: "Not found") }
+      } else { android.set_text(view: status, text: "Invalid ID") }
+    }
+  }
+}
