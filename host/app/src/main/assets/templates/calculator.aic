@@ -1,4 +1,4 @@
-aic_version 0.1
+aic_version 0.2
 app "AIC Calculator" package "dev.aic.generated.calculator" {
   activity MainActivity {
     on_create {

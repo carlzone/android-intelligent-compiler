@@ -1,0 +1,1 @@
+aic_version 0.2 app "Visibility conflict" package "dev.aic.visibilityconflict" { activity MainActivity { on_create { let button = android.button(text: "Button") android.set_visibility(view: button, visibility: visible) android.set_visibility(view: button, visibility: gone) android.set_content_view(button) } } }

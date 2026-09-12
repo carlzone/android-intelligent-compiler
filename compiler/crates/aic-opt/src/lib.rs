@@ -1,8 +1,8 @@
 //! Whole-program, semantics-preserving optimizations for verified AIC IR.
 #![allow(clippy::enum_glob_use, clippy::many_single_char_names)]
 use aic_ir::{
-    BinaryOp, Capability, Expression, ExpressionKind, Program, Statement, StatementKind, UnaryOp,
-    Value,
+    BinaryOp, Capability, CollectionItems, Expression, ExpressionKind, Program, Statement,
+    StatementKind, UnaryOp, Value,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -69,13 +69,19 @@ pub fn optimize_with_report(
         for f in &mut p.functions {
             f.body = statements(std::mem::take(&mut f.body));
         }
-        for s in &mut p.activity.state {
-            s.initial = expression(s.initial.clone());
+        for activity in &mut p.activities {
+            for s in &mut activity.state {
+                s.initial = expression(s.initial.clone());
+            }
+            activity.on_create = statements(std::mem::take(&mut activity.on_create));
+            for h in &mut activity.on_click {
+                h.body = statements(std::mem::take(&mut h.body));
+            }
+            for h in &mut activity.on_select {
+                h.body = statements(std::mem::take(&mut h.body));
+            }
         }
-        p.activity.on_create = statements(std::mem::take(&mut p.activity.on_create));
-        for h in &mut p.activity.on_click {
-            h.body = statements(std::mem::take(&mut h.body));
-        }
+        p.activity = p.activities[0].clone();
         let reachable = reachable_functions(&p);
         p.functions.retain(|f| reachable.contains(&f.name));
         let used = analyze(&p);
@@ -107,12 +113,17 @@ pub fn analyze(p: &Program) -> Reachability {
     r
 }
 fn roots(p: &Program, r: &mut Reachability) {
-    for s in &p.activity.state {
-        inspect_expression(&s.initial, r);
-    }
-    inspect_statements(&p.activity.on_create, r);
-    for h in &p.activity.on_click {
-        inspect_statements(&h.body, r);
+    for activity in &p.activities {
+        for s in &activity.state {
+            inspect_expression(&s.initial, r);
+        }
+        inspect_statements(&activity.on_create, r);
+        for h in &activity.on_click {
+            inspect_statements(&h.body, r);
+        }
+        for h in &activity.on_select {
+            inspect_statements(&h.body, r);
+        }
     }
 }
 fn reachable_functions(p: &Program) -> BTreeSet<String> {
@@ -166,9 +177,14 @@ fn statements(body: Vec<Statement>) -> Vec<Statement> {
                 id,
                 hint: expression(hint),
             },
-            StatementKind::TextInput { id, hint } => StatementKind::TextInput {
+            StatementKind::TextInput {
+                id,
+                hint,
+                input_type,
+            } => StatementKind::TextInput {
                 id,
                 hint: expression(hint),
+                input_type,
             },
             StatementKind::SetText { view, text } => StatementKind::SetText {
                 view,
@@ -310,6 +326,7 @@ fn expression(mut e: Expression) -> Expression {
     e
 }
 
+#[allow(clippy::too_many_lines)]
 fn inspect_statements(xs: &[Statement], r: &mut Reachability) {
     for s in xs {
         match &s.kind {
@@ -317,12 +334,30 @@ fn inspect_statements(xs: &[Statement], r: &mut Reachability) {
             | StatementKind::Assign { value, .. }
             | StatementKind::Return(value)
             | StatementKind::SetText { text: value, .. } => inspect_expression(value, r),
+            StatementKind::SetEnabled { enabled: value, .. }
+            | StatementKind::SetContentDescription { text: value, .. } => {
+                inspect_expression(value, r);
+            }
             StatementKind::TextView { id, text }
             | StatementKind::Button { id, text }
             | StatementKind::EditText { id, hint: text }
-            | StatementKind::TextInput { id, hint: text } => {
+            | StatementKind::TextInput { id, hint: text, .. }
+            | StatementKind::CheckBox { id, text }
+            | StatementKind::Switch { id, text } => {
                 r.views.insert(id.clone());
                 inspect_expression(text, r);
+            }
+            StatementKind::Toolbar { id, title } => {
+                r.views.insert(id.clone());
+                inspect_expression(title, r);
+            }
+            StatementKind::ListView { id, items } | StatementKind::Spinner { id, items } => {
+                r.views.insert(id.clone());
+                if let CollectionItems::Inline(items) = items {
+                    for item in items {
+                        inspect_expression(item, r);
+                    }
+                }
             }
             StatementKind::If {
                 condition,
@@ -342,11 +377,26 @@ fn inspect_statements(xs: &[Statement], r: &mut Reachability) {
             }
             StatementKind::LinearLayout { id, .. }
             | StatementKind::ScrollView { id }
+            | StatementKind::FrameLayout { id }
+            | StatementKind::ProgressBar { id }
+            | StatementKind::ImageView { id, .. }
             | StatementKind::SetContentView { view: id }
             | StatementKind::SetLayout { view: id, .. }
+            | StatementKind::SetTextSize { view: id, .. }
+            | StatementKind::SetHeading { view: id }
+            | StatementKind::SetDecorative { view: id }
             | StatementKind::SetTextColor { view: id, .. }
             | StatementKind::SetBackgroundColor { view: id, .. } => {
                 r.views.insert(id.clone());
+            }
+            StatementKind::SetPadding { view, .. }
+            | StatementKind::SetVisibility { view, .. }
+            | StatementKind::SetGravity { view, .. } => {
+                r.views.insert(view.clone());
+            }
+            StatementKind::SetInputLabel { label, input } => {
+                r.views.insert(label.clone());
+                r.views.insert(input.clone());
             }
             StatementKind::AddView { parent, child } => {
                 r.views.insert(parent.clone());
@@ -365,6 +415,20 @@ fn inspect_statements(xs: &[Statement], r: &mut Reachability) {
                 r.capabilities.insert(Capability::Sqlite);
                 r.tables.insert(table.clone());
                 inspect_expression(id, r);
+            }
+            StatementKind::StartActivity { extras, .. } => {
+                for (_, value) in extras {
+                    inspect_expression(value, r);
+                }
+            }
+            StatementKind::FinishActivity => {}
+            StatementKind::ShowDialog { title, message } => {
+                inspect_expression(title, r);
+                inspect_expression(message, r);
+            }
+            StatementKind::ShowMenu { anchor, item } => {
+                r.views.insert(anchor.clone());
+                inspect_expression(item, r);
             }
         }
     }
@@ -490,6 +554,105 @@ mod tests {
         assert_eq!(p, q);
         assert_eq!(a, b);
         assert_eq!(a.removed_functions(), 0);
+    }
+
+    #[test]
+    fn m9_text_sizes_survive_o0_and_o1() {
+        let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+        for options in [
+            CompilerOptions {
+                optimization_level: OptimizationLevel::None,
+            },
+            CompilerOptions::default(),
+        ] {
+            let optimized = optimize(program.clone(), options);
+            assert!(optimized
+                .activities
+                .iter()
+                .flat_map(|activity| &activity.on_create)
+                .any(|statement| matches!(
+                    statement.kind,
+                    StatementKind::SetTextSize { size_sp: 24, .. }
+                )));
+        }
+    }
+
+    #[test]
+    fn m9_literal_colors_survive_o0_and_o1() {
+        let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+        for options in [
+            CompilerOptions {
+                optimization_level: OptimizationLevel::None,
+            },
+            CompilerOptions::default(),
+        ] {
+            let optimized = optimize(program.clone(), options);
+            let statements = optimized
+                .activities
+                .iter()
+                .flat_map(|activity| &activity.on_create)
+                .collect::<Vec<_>>();
+            assert!(statements.iter().any(|statement| matches!(
+                &statement.kind,
+                StatementKind::SetTextColor { view, color }
+                    if view == "title" && color == "#202124"
+            )));
+            assert!(statements.iter().any(|statement| matches!(
+                &statement.kind,
+                StatementKind::SetBackgroundColor { view, color }
+                    if view == "root" && color == "#E8F0FE"
+            )));
+        }
+    }
+
+    #[test]
+    fn m9_touch_target_controls_survive_o0_and_o1() {
+        let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+        for options in [
+            CompilerOptions {
+                optimization_level: OptimizationLevel::None,
+            },
+            CompilerOptions::default(),
+        ] {
+            let optimized = optimize(program.clone(), options);
+            let statements = optimized
+                .activities
+                .iter()
+                .flat_map(|activity| &activity.on_create)
+                .collect::<Vec<_>>();
+            for predicate in [
+                |statement: &&aic_ir::Statement| {
+                    matches!(statement.kind, StatementKind::Button { .. })
+                },
+                |statement: &&aic_ir::Statement| {
+                    matches!(statement.kind, StatementKind::TextInput { .. })
+                },
+                |statement: &&aic_ir::Statement| {
+                    matches!(statement.kind, StatementKind::CheckBox { .. })
+                },
+                |statement: &&aic_ir::Statement| {
+                    matches!(statement.kind, StatementKind::Switch { .. })
+                },
+                |statement: &&aic_ir::Statement| {
+                    matches!(statement.kind, StatementKind::Toolbar { .. })
+                },
+                |statement: &&aic_ir::Statement| {
+                    matches!(statement.kind, StatementKind::ListView { .. })
+                },
+                |statement: &&aic_ir::Statement| {
+                    matches!(statement.kind, StatementKind::Spinner { .. })
+                },
+            ] {
+                assert!(statements.iter().any(predicate));
+            }
+            assert!(statements.iter().any(|statement| matches!(
+                statement.kind,
+                StatementKind::SetLayout {
+                    height: aic_ir::LayoutSize::Dp(48),
+                    ..
+                }
+            )));
+        }
     }
 
     #[test]

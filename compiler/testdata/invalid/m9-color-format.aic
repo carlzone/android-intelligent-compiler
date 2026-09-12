@@ -1,0 +1,1 @@
+aic_version 0.2 app "Bad color format" package "dev.aic.badcolorformat" { activity MainActivity { on_create { let text = android.text_view(text: "Text") android.set_text_color(view: text, color: "red") android.set_content_view(text) } } }

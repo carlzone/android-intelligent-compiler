@@ -102,7 +102,7 @@ class MainActivity : Activity() {
     private fun about() {
         val notices=assets.open("toolchain/NOTICE.txt").bufferedReader().use { it.readText() }
         val versions=assets.open("toolchain/versions.txt").bufferedReader().use { it.readText() }
-        val content=TextView(this).apply { setPadding(dp(16),dp(16),dp(16),dp(16)); text="AIC Host 0.8.0\nAI proposals use schema ${AiProtocol.SCHEMA_VERSION} and remain subject to local compiler validation.\n\n$versions\n$notices"; setTextIsSelectable(true) }
+        val content=TextView(this).apply { setPadding(dp(16),dp(16),dp(16),dp(16)); text="AIC Host 0.9.0\nAIC IR 0.2 / aic.capabilities/0.2\nAI proposals use schema ${AiProtocol.SCHEMA_VERSION} and remain subject to local compiler validation.\n\n$versions\n$notices"; setTextIsSelectable(true) }
         AlertDialog.Builder(this).setTitle("About and licenses").setView(ScrollView(this).apply { addView(content) }).setPositiveButton("Close",null).show()
     }
     private fun data(): ProjectData?=project?.data?.copy(source=source.text.toString(),optLevel=if(level.isChecked) 1 else 0)

@@ -27,4 +27,13 @@ class ProjectCodecTest {
         for(p in listOf(ProjectData("", ""),ProjectData("x","", "android-99"),ProjectData("x","",optLevel=2),ProjectData("x","a".repeat(ProjectCodec.MAX_SOURCE+1))))
             assertThrows(IllegalArgumentException::class.java) { ProjectCodec.encode(p) }
     }
+    @Test fun formatTwoPreservesValidatedImages() {
+        val png=byteArrayOf(0x89.toByte(),0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,13,0x49,0x48,0x44,0x52,0,0,0,1,0,0,0,1)
+        val project=ProjectData("images","aic_version 0.2",images=mapOf("logo.png" to png))
+        val decoded=ProjectCodec.decode(ProjectCodec.encode(project))
+        assertEquals(project,decoded)
+        assertArrayEquals(png,decoded.images.getValue("logo.png"))
+        assertThrows(IllegalArgumentException::class.java) { ProjectCodec.encode(project.copy(images=mapOf("../logo.png" to png))) }
+        assertThrows(IllegalArgumentException::class.java) { ProjectCodec.encode(project.copy(images=mapOf("logo.png" to byteArrayOf(1,2,3)))) }
+    }
 }

@@ -1,0 +1,1 @@
+aic_version 0.2 app "Conflicting semantics" package "dev.aic.conflictingsemantics" { activity MainActivity { on_create { let image = android.image_view(icon: info) android.set_content_description(view: image, text: "Information") android.set_decorative(view: image) android.set_content_view(image) } } }

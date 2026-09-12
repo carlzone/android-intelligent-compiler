@@ -1,0 +1,10 @@
+aic_version 0.2
+app "Typed collection" package "dev.aic.typedcollection" {
+  activity MainActivity {
+    state items: string[] = ["Valid", 7]
+    on_create {
+      let list = android.list_view(items: items)
+      android.set_content_view(list)
+    }
+  }
+}

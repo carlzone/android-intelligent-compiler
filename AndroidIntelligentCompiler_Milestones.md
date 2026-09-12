@@ -34,8 +34,9 @@ AI output is always untrusted input. It may propose AIC IR, but parsing, validat
 | M8 | Toolchain independence | M6 | Supported APK pipeline is self-contained |
 | M9 | Production UI and navigation profile | M8 | Adaptive multi-screen application corpus passes |
 | M10 | Platform services, data, and runtime | M9 | Connected/offline application corpus passes |
-| M11 | Specialized local AI with Soup | Stable M9-M10 capability contracts | Held-out AIC model evaluation passes |
-| M12 | Production hardening, backends, and ecosystem | M8-M11 | Reproducible distribution-ready supported subset |
+| M11 | AI-native modular development and AIC Studio | M9-M10 language and service contracts | Modular guided/autonomous reference corpus passes |
+| M12 | Specialized local AI with Soup | Stable M11 authoring and evaluation contracts | Held-out AIC model evaluation passes |
+| M13 | Production hardening, backends, and ecosystem | M8-M12 | Reproducible distribution-ready supported subset |
 
 The sequence is intentionally gated. Work from a later milestone may be researched early, but it must not expand the implementation scope of the active milestone.
 
@@ -288,6 +289,24 @@ Exit gate: The supported AIC feature subset compiles, packages, signs, installs,
 
 ### M9 - Production UI and Navigation Profile
 
+Status: **Implementation in progress (2026-09-08)**. IR 0.2 migration, the capability catalog, multi-Activity packaging,
+direct start/finish navigation, and the first layout/accessibility properties are implemented. The remaining corpus and
+device exit gates are tracked in `compiler/docs/m9-acceptance-evidence.md`.
+
+M9 execution is divided into durable checkpoints. `Implemented` means the code and focused local tests exist; it does not close the milestone or waive cross-device evidence.
+
+| Phase | Deliverable | Status | Resume condition |
+| --- | --- | --- | --- |
+| M9.1 | IR 0.2, deterministic 0.1 migration, capability catalog, CLI/JNI/host version contract | Implemented | Keep regression coverage green |
+| M9.2 | Multi-screen lifecycle and typed navigation | Partial | Typed extras implemented; start-for-result, typed results, and Bundle restoration remain |
+| M9.3 | Production layouts, widgets, reusable rows, and accessibility validation | Partial | Core accessibility and literal color properties have local and API 36 ARM64 evidence; resume with remaining families and broader device coverage |
+| M9.4 | Resource table, localization, themes, icons, and project image packaging | Partial | Project archive validation exists; compiler packaging remains |
+| M9.5 | Orientation, compact/expanded adaptation, lifecycle and accessibility corpus | Not started | Begin after navigation/state and resources stabilize |
+| M9.6 | Host/AI integration, diagnostics, reference applications, and documentation | Partial | Complete against the final M9 language surface |
+| M9.7 | Desktop, independent-tool, accessibility, and device acceptance | Blocked by implementation and M8 matrix | Run only from one recorded source/toolchain fingerprint |
+
+Current resume point: **M9.3 remaining widget/property families and broader device evidence**. IR 0.2 literal text/background colors now have complete schema, verifier, optimizer, direct DEX lowering, fixture, catalog, deterministic O0/O1 coverage, and passing API 36 ARM64 O0/O1 device evidence. Strict image/progress semantics and visibility/enabled validation retain their completed local and API 36 ARM64 O0/O1 evidence. M9.2 typed results and lifecycle-safe Bundle restoration remain open before milestone closure. The detailed ordered checklist and new-thread handoff are in `compiler/docs/m9-production-ui-navigation.md`.
+
 Objective: Expand AIC from the initial linear-layout profile into a practical, versioned Android UI and navigation language.
 
 Scope:
@@ -336,7 +355,38 @@ Acceptance criteria:
 
 Exit gate: The declared connected-application corpus passes functional, lifecycle, privacy, permission, offline, and recovery tests on every supported device profile.
 
-### M11 - Specialized Local AI with Soup
+### M11 - AI-Native Modular Development and AIC Studio
+
+Objective: Enable models across a broad capability range to build maintainable applications through modular context, bounded changes, compiler-guided repair, and a modern reviewable host workspace.
+
+The architecture and authoring rules are specified in `compiler/docs/m11-ai-native-modular-studio.md` and `compiler/docs/aic-ai-authoring-standard-0.3.md`.
+
+Scope:
+
+- Publish AIC IR 0.3 and `.aicproject` format 3 with a root manifest and canonical screen, component, domain, service, and resource modules.
+- Provide deterministic, reviewable migration from single-file IR 0.2/project format 2; formats 1-2 remain readable and stored projects are never rewritten without approval.
+- Add explicit imports/exports, composition-oriented components with typed parameters and events, private state, and bounded service contracts; prohibit wildcard imports, inheritance, reflection, ambiguous symbols, path traversal, and dependency cycles.
+- Generate a semantic project index containing compact symbol interfaces, dependencies, navigation, resources, and component usage so prompts receive relevant context rather than the complete project.
+- Replace complete-project AI rewriting with atomic file- and symbol-level patch operations protected by project/module hashes and all-or-nothing validation.
+- Provide Guided, Assisted, and Autonomous workflows. Recommend page- or feature-level instructions from measured model performance rather than hard-coded model names.
+- Ship a versioned standard component set with compiler-enforced behavior, accessibility, and minimum touch-target contracts; keep semantic reuse decisions under AI proposal and user review.
+- Redesign the host as the core AIC Studio workspace: AI/blank/template/import creation, project tree, per-module editor, contextual AI panel, application-plan review, per-file diffs, and consolidated build/diagnostic status with responsive phone/tablet navigation.
+
+Acceptance criteria:
+
+1. Large modular multi-screen projects compile deterministically, and physical module or archive ordering cannot change generated output.
+1. Invalid paths/imports, cycles, duplicate or ambiguous symbols, stale hashes, and component contract violations produce stable file-and-source-located diagnostics.
+1. AI proposals touch only declared files/symbols; validation is transactional and every failure preserves the complete prior project.
+1. Context retrieval omits unrelated implementations while supplying every required interface and capability constraint.
+1. A qualified lower-capability model completes the reference application through Guided page-by-page work, and a qualified higher-capability model completes it from a whole-app description through an approved plan and bounded Autonomous patches.
+1. Both workflows pass the same compiler, accessibility, compatibility, and device gates; reports include first-pass compilation, repair success, unintended changes, unsupported-capability accuracy, token use, and review steps.
+1. AIC Studio completes create/import, browse, edit, plan/review/apply, build, install, and interruption-recovery scenarios on supported phone and tablet layouts.
+
+Deferred: synchronized visual source editing, navigation-graph editing, multi-configuration device previews, and component galleries are post-M11 enhancements.
+
+Exit gate: A modular reference corpus can be authored by both guided lower-capability and autonomous higher-capability model workflows, reviewed in AIC Studio, and built through the same deterministic production gates.
+
+### M12 - Specialized Local AI with Soup
 
 Objective: Train and ship an optional local model specialized for AIC planning, constrained edits, repair, and honest unsupported-intent reporting.
 
@@ -362,7 +412,7 @@ Acceptance criteria:
 
 Exit gate: A pinned Soup-trained local model passes the held-out AIC evaluation suite and completes the representative prompt-to-APK corpus while correctly declining unsupported requests.
 
-### M12 - Production Hardening, Backends, and Ecosystem
+### M13 - Production Hardening, Backends, and Ecosystem
 
 Objective: Mature the expanded supported profile into a reproducible, governed, distribution-ready toolchain.
 
@@ -391,21 +441,22 @@ Exit gate: A declared production-grade subset builds reproducibly and passes com
 
 | Test layer | Introduced | Continues through |
 | --- | --- | --- |
-| Pure unit tests for encoding and lowering | M0 | M12 |
-| Golden DEX/APK fixtures | M0 | M12 |
-| Independent structural verification | M0 | M12 |
-| Physical-device install/launch smoke tests | M1 | M12 |
-| Semantic valid/invalid IR fixtures | M2 | M12 |
-| Optimization differential tests | M2 | M12 |
-| Interactive UI tests | M3 | M12 |
-| Persistence and permission tests | M4 | M12 |
-| Size and performance benchmarks | M5 | M12 |
-| On-device workflow tests | M6 | M12 |
-| AI evaluation and repair-loop tests | M7 | M12 |
-| Android/API compatibility corpus | M8 | M12 |
-| Adaptive UI, navigation, accessibility, and migration tests | M9 | M12 |
-| Network, async, permission, privacy, and recovery tests | M10 | M12 |
-| Model dataset, calibration, quantization, and held-out evaluations | M11 | M12 |
+| Pure unit tests for encoding and lowering | M0 | M13 |
+| Golden DEX/APK fixtures | M0 | M13 |
+| Independent structural verification | M0 | M13 |
+| Physical-device install/launch smoke tests | M1 | M13 |
+| Semantic valid/invalid IR fixtures | M2 | M13 |
+| Optimization differential tests | M2 | M13 |
+| Interactive UI tests | M3 | M13 |
+| Persistence and permission tests | M4 | M13 |
+| Size and performance benchmarks | M5 | M13 |
+| On-device workflow tests | M6 | M13 |
+| AI evaluation and repair-loop tests | M7 | M13 |
+| Android/API compatibility corpus | M8 | M13 |
+| Adaptive UI, navigation, accessibility, and migration tests | M9 | M13 |
+| Network, async, permission, privacy, and recovery tests | M10 | M13 |
+| Modular project, targeted-patch, context-retrieval, and Studio workflow tests | M11 | M13 |
+| Model dataset, calibration, quantization, and held-out evaluations | M12 | M13 |
 
 ## 7. Dependencies and Decision Gates
 
@@ -423,8 +474,9 @@ The following decisions must be made before the indicated work begins:
 | Supported Android/API compatibility matrix | Before M8 exit | Publish tested profiles and exclusions |
 | Expanded IR version and UI capability boundary | Before M9 | Approve capability catalog and migration ADR |
 | Platform-service and permission subset | Before M10 | Approve threat model, privacy policy, and Android API list |
-| Soup/base model, dataset license, and training hardware | Before M11 | Record reproducible training and evaluation ADR |
-| Release distribution and key-management model | Before M12 exit | Complete security and policy review |
+| IR 0.3 module, patch, migration, and Studio interaction contracts | Before M11 | Approve modular-project and AI-authoring ADRs |
+| Soup/base model, dataset license, and training hardware | Before M12 | Record reproducible training and evaluation ADR |
+| Release distribution and key-management model | Before M13 exit | Complete security and policy review |
 
 ## 8. Milestone Tracking Template
 

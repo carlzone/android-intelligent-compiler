@@ -6,6 +6,21 @@ fn u32_at(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
 }
 
+fn assert_strict_method_id_order(bytes: &[u8]) {
+    let count = usize::try_from(u32_at(bytes, 88)).unwrap();
+    let offset = usize::try_from(u32_at(bytes, 92)).unwrap();
+    let methods = (0..count)
+        .map(|index| {
+            let at = offset + index * 8;
+            let class = u16::from_le_bytes([bytes[at], bytes[at + 1]]);
+            let proto = u16::from_le_bytes([bytes[at + 2], bytes[at + 3]]);
+            let name = u32_at(bytes, at + 4);
+            (class, name, proto)
+        })
+        .collect::<Vec<_>>();
+    assert!(methods.windows(2).all(|pair| pair[0] < pair[1]));
+}
+
 fn dex_strings(bytes: &[u8]) -> Vec<String> {
     let count = u32_at(bytes, 56) as usize;
     let ids = u32_at(bytes, 60) as usize;
@@ -181,7 +196,7 @@ fn m3_emits_activity_fields_and_click_dispatch() {
     let source = include_str!("../../../testdata/counter.aic");
     let program = parse_program(source).unwrap();
     let bytes = encode_activity_dex(&program).unwrap();
-    assert_eq!(u32_at(&bytes, 80), 6);
+    assert_eq!(u32_at(&bytes, 80), 8);
     assert!(bytes.windows(7).any(|value| value == b"onClick"));
     assert!(bytes.windows(5).any(|value| value == b"count"));
     assert!(bytes.windows(2).any(|word| word[0] == 0x52)); // iget
@@ -241,4 +256,266 @@ fn m4_emits_deterministic_governed_persistence() {
     assert!(!hello
         .windows("SharedPreferences".len())
         .any(|value| value == b"SharedPreferences"));
+}
+
+#[test]
+fn m9_emits_all_typed_navigation_extra_overloads() {
+    let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    let bytes = encode_activity_dex(&program).unwrap();
+    for symbol in ["putExtra", "item_id", "editable", "title"] {
+        assert!(
+            bytes
+                .windows(symbol.len())
+                .any(|value| value == symbol.as_bytes()),
+            "missing {symbol}"
+        );
+    }
+    assert_eq!(bytes, encode_activity_dex(&program).unwrap());
+}
+
+#[test]
+fn m9_emits_bounded_dimensions_and_margins() {
+    let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    let bytes = encode_activity_dex(&program).unwrap();
+    assert!(bytes
+        .windows("setMargins".len())
+        .any(|value| value == b"setMargins"));
+    assert_eq!(bytes, encode_activity_dex(&program).unwrap());
+}
+
+#[test]
+fn m9_emits_common_input_modes_and_platform_spinner() {
+    let mut program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    program.activity = program.activities[2].clone();
+    program.activities = vec![program.activity.clone()];
+    let bytes = encode_activity_dex(&program).unwrap();
+    for symbol in [
+        "Landroid/widget/Spinner;",
+        "setInputType",
+        "setDropDownViewResource",
+        "Landroid/widget/SpinnerAdapter;",
+        "setFitsSystemWindows",
+    ] {
+        assert!(
+            bytes
+                .windows(symbol.len())
+                .any(|value| value == symbol.as_bytes()),
+            "missing {symbol}"
+        );
+    }
+    for forbidden in ["java/lang/reflect", "androidx/"] {
+        assert!(!bytes
+            .windows(forbidden.len())
+            .any(|value| value == forbidden.as_bytes()));
+    }
+    assert_eq!(bytes, encode_activity_dex(&program).unwrap());
+}
+
+#[test]
+fn m9_emits_state_collections_and_typed_selection_listeners_deterministically() {
+    let source = include_str!("../../../testdata/m9-navigation.aic");
+    let parsed = parse_program(source).unwrap();
+    for activity_index in [0, 2] {
+        let mut program = parsed.clone();
+        program.activity = program.activities[activity_index].clone();
+        program.activities = vec![program.activity.clone()];
+        for options in [
+            CompilerOptions {
+                optimization_level: aic_opt::OptimizationLevel::None,
+            },
+            CompilerOptions::default(),
+        ] {
+            let optimized = optimize(program.clone(), options);
+            let bytes = encode_activity_dex(&optimized).unwrap();
+            assert_strict_method_id_order(&bytes);
+            let expected = if activity_index == 0 {
+                [
+                    "[Ljava/lang/String;",
+                    "OnItemClickListener",
+                    "onItemClick",
+                    "getItemAtPosition",
+                    "destinations",
+                ]
+            } else {
+                [
+                    "[Ljava/lang/String;",
+                    "OnItemSelectedListener",
+                    "onItemSelected",
+                    "onNothingSelected",
+                    "selectionReady$choice",
+                ]
+            };
+            for symbol in expected {
+                assert!(
+                    bytes
+                        .windows(symbol.len())
+                        .any(|window| window == symbol.as_bytes()),
+                    "missing {symbol}"
+                );
+            }
+            assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
+        }
+    }
+}
+
+#[test]
+fn m9_emits_bounded_sp_text_sizes_deterministically() {
+    let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    for options in [
+        CompilerOptions {
+            optimization_level: aic_opt::OptimizationLevel::None,
+        },
+        CompilerOptions::default(),
+    ] {
+        let optimized = optimize(program.clone(), options);
+        let bytes = encode_activity_dex(&optimized).unwrap();
+        assert_strict_method_id_order(&bytes);
+        for symbol in ["setTextSize", "IF", "F"] {
+            assert!(
+                bytes
+                    .windows(symbol.len())
+                    .any(|window| window == symbol.as_bytes()),
+                "missing {symbol}"
+            );
+        }
+        for forbidden in ["java/lang/reflect", "scaledDensity"] {
+            assert!(!bytes
+                .windows(forbidden.len())
+                .any(|window| window == forbidden.as_bytes()));
+        }
+        assert!(bytes
+            .windows(4)
+            .any(|window| window == 24_f32.to_bits().to_le_bytes()));
+        assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
+    }
+}
+
+#[test]
+fn m9_emits_literal_color_properties_deterministically() {
+    let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    for options in [
+        CompilerOptions {
+            optimization_level: aic_opt::OptimizationLevel::None,
+        },
+        CompilerOptions::default(),
+    ] {
+        let optimized = optimize(program.clone(), options);
+        let bytes = encode_activity_dex(&optimized).unwrap();
+        assert_strict_method_id_order(&bytes);
+        for symbol in [
+            "Landroid/graphics/Color;",
+            "parseColor",
+            "setTextColor",
+            "setBackgroundColor",
+            "#202124",
+            "#E8F0FE",
+        ] {
+            assert!(
+                bytes
+                    .windows(symbol.len())
+                    .any(|window| window == symbol.as_bytes()),
+                "missing {symbol}"
+            );
+        }
+        assert!(!bytes
+            .windows("java/lang/reflect".len())
+            .any(|window| window == b"java/lang/reflect"));
+        assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
+    }
+}
+
+#[test]
+fn m9_emits_density_aware_minimum_touch_targets_deterministically() {
+    let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    for options in [
+        CompilerOptions {
+            optimization_level: aic_opt::OptimizationLevel::None,
+        },
+        CompilerOptions::default(),
+    ] {
+        let optimized = optimize(program.clone(), options);
+        let bytes = encode_activity_dex(&optimized).unwrap();
+        assert_strict_method_id_order(&bytes);
+        for symbol in [
+            "getResources",
+            "getDisplayMetrics",
+            "densityDpi",
+            "platform$minimumTouchTarget",
+            "setMinimumWidth",
+            "setMinimumHeight",
+        ] {
+            assert!(
+                bytes
+                    .windows(symbol.len())
+                    .any(|window| window == symbol.as_bytes()),
+                "missing {symbol}"
+            );
+        }
+        assert!(!bytes
+            .windows("java/lang/reflect".len())
+            .any(|window| window == b"java/lang/reflect"));
+        assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
+    }
+}
+
+#[test]
+fn m9_emits_input_labels_and_guarded_headings_deterministically() {
+    let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    for options in [
+        CompilerOptions {
+            optimization_level: aic_opt::OptimizationLevel::None,
+        },
+        CompilerOptions::default(),
+    ] {
+        let optimized = optimize(program.clone(), options);
+        let bytes = encode_activity_dex(&optimized).unwrap();
+        assert_strict_method_id_order(&bytes);
+        for symbol in [
+            "generateViewId",
+            "setId",
+            "setLabelFor",
+            "SDK_INT",
+            "setAccessibilityHeading",
+        ] {
+            assert!(
+                bytes
+                    .windows(symbol.len())
+                    .any(|window| window == symbol.as_bytes()),
+                "missing {symbol}"
+            );
+        }
+        assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
+    }
+}
+
+#[test]
+fn m9_emits_accessibility_semantics_deterministically() {
+    let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    for options in [
+        CompilerOptions {
+            optimization_level: aic_opt::OptimizationLevel::None,
+        },
+        CompilerOptions::default(),
+    ] {
+        let optimized = optimize(program.clone(), options);
+        let bytes = encode_activity_dex(&optimized).unwrap();
+        assert!(optimized
+            .activities
+            .iter()
+            .any(
+                |activity| activity.on_create.iter().any(|statement| matches!(
+                    statement.kind,
+                    aic_ir::StatementKind::SetDecorative { .. }
+                ))
+            ));
+        for symbol in ["setContentDescription", "setImportantForAccessibility"] {
+            assert!(
+                bytes
+                    .windows(symbol.len())
+                    .any(|window| window == symbol.as_bytes()),
+                "missing {symbol}"
+            );
+        }
+        assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
+    }
 }

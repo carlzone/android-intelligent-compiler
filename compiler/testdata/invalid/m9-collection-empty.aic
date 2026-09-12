@@ -1,0 +1,10 @@
+aic_version 0.2
+app "Empty collection" package "dev.aic.emptycollection" {
+  activity MainActivity {
+    state items: string[] = []
+    on_create {
+      let list = android.list_view(items: items)
+      android.set_content_view(list)
+    }
+  }
+}

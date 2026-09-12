@@ -1,0 +1,9 @@
+aic_version 0.2 app "Invalid Text Size" package "dev.aic.invalid" {
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      android.set_text_size(view: root, size_sp: 18)
+      android.set_content_view(root)
+    }
+  }
+}

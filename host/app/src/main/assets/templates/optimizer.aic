@@ -1,4 +1,4 @@
-aic_version 0.1
+aic_version 0.2
 app "AIC Optimizer" package "dev.aic.generated.optimizer" {
   capability persistence.key_value
   preference legacy_flag: bool = false

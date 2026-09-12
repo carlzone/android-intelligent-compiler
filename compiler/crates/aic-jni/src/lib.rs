@@ -28,12 +28,15 @@ pub fn compile_request(source: &str, output: &Path, level: i32) -> String {
                 fs::write(output.join("AndroidManifest.axml"), &a.binary_manifest)?;
                 fs::write(output.join("unsigned.apk"), &a.unsigned_apk)?;
                 fs::write(output.join("classes.dex"), &a.dex)?;
+                for (name, bytes) in &a.dex_files {
+                    fs::write(output.join(name), bytes)?;
+                }
                 fs::write(output.join("AndroidManifest.xml"), &a.manifest)?;
                 fs::write(output.join("build-profile.txt"), &a.build_profile)?;
                 Ok(())
             };
             match write() {
-                Ok(()) => json!({"ok":true,"package":a.package,"activity":a.activity,"report":a.build_profile,"diagnostics":[]}).to_string(),
+                Ok(()) => json!({"ok":true,"package":a.package,"activity":a.activity,"activities":a.activities,"irVersion":a.ir_version,"catalogVersion":a.catalog_version,"migrationRequired":a.ir_version=="0.1","report":a.build_profile,"diagnostics":[]}).to_string(),
                 Err(e) => failure("write", "AIC6002", &e.to_string()),
             }
         }
@@ -57,7 +60,7 @@ pub fn validate_request(source: &str, level: i32) -> String {
         },
     };
     match aic_build::compile_source(source, options) {
-        Ok(a) => json!({"ok":true,"package":a.package,"activity":a.activity,"report":a.build_profile,"diagnostics":[]}).to_string(),
+        Ok(a) => json!({"ok":true,"package":a.package,"activity":a.activity,"activities":a.activities,"irVersion":a.ir_version,"catalogVersion":a.catalog_version,"migrationRequired":a.ir_version=="0.1","report":a.build_profile,"diagnostics":[]}).to_string(),
         Err(e) => json!({"ok":false,"diagnostics":[{"stage":e.stage,"code":e.code,"message":e.message,
             "location":e.location.map(|s| json!({"line":s.start.line,"column":s.start.column,"endLine":s.end.line,"endColumn":s.end.column}))}]}).to_string(),
     }

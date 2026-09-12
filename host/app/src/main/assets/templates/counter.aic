@@ -1,4 +1,4 @@
-aic_version 0.1
+aic_version 0.2
 app "AIC Counter" package "dev.aic.generated.counter" {
   activity MainActivity {
     state count: i32 = 0

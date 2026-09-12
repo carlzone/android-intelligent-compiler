@@ -1,0 +1,1 @@
+aic_version 0.2 app "Bad enabled target" package "dev.aic.badenabled" { activity MainActivity { on_create { let image = android.image_view(icon: info) android.set_decorative(view: image) android.set_enabled(view: image, enabled: false) android.set_content_view(image) } } }

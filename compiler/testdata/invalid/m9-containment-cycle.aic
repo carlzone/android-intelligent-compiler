@@ -1,0 +1,12 @@
+aic_version 0.2
+app "Invalid containment" package "dev.aic.invalidcontainment" {
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let child = android.frame_layout()
+      android.add_view(parent: root, child: child)
+      android.add_view(parent: child, child: root)
+      android.set_content_view(root)
+    }
+  }
+}

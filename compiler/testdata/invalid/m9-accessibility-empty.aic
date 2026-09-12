@@ -1,0 +1,1 @@
+aic_version 0.2 app "Empty semantics" package "dev.aic.emptysemantics" { activity MainActivity { on_create { let progress = android.progress_bar() android.set_content_description(view: progress, text: "  ") android.set_content_view(progress) } } }

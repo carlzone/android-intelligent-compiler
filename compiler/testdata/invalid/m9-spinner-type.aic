@@ -1,0 +1,11 @@
+aic_version 0.2
+app "Typed spinner" package "dev.aic.typedspinner" {
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let choice = android.spinner(items: ["Valid", 7])
+      android.add_view(parent: root, child: choice)
+      android.set_content_view(root)
+    }
+  }
+}

@@ -1,0 +1,12 @@
+aic_version 0.2
+app "Selection target" package "dev.aic.selectiontarget" {
+  activity MainActivity {
+    on_create {
+      let button = android.button(text: "Not a list")
+      android.set_content_view(button)
+    }
+    on_select(button, index, value) {
+      android.set_text(view: button, text: value)
+    }
+  }
+}

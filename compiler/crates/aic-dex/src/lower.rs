@@ -12,10 +12,10 @@ use crate::{
     DexError,
 };
 use aic_ir::{
-    BinaryOp, Expression, ExpressionKind, Function, Preference, Statement, StatementKind, Table,
-    Type, UnaryOp, Value,
+    BinaryOp, CollectionItems, Expression, ExpressionKind, Function, Preference, Statement,
+    StatementKind, Table, Type, UnaryOp, Value,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) const VALID_I32_PATTERN: &str = "(?:[+-]?0*[0-9]{1,9}|[+]?0*(?:1[0-9]{9}|20[0-9]{8}|21[0-3][0-9]{7}|214[0-6][0-9]{6}|2147[0-3][0-9]{5}|21474[0-7][0-9]{4}|214748[0-2][0-9]{3}|2147483[0-5][0-9]{2}|21474836[0-3][0-9]|214748364[0-7])|-0*(?:1[0-9]{9}|20[0-9]{8}|21[0-3][0-9]{7}|214[0-6][0-9]{6}|2147[0-3][0-9]{5}|21474[0-7][0-9]{4}|214748[0-2][0-9]{3}|2147483[0-5][0-9]{2}|21474836[0-3][0-9]|214748364[0-8]))";
 
@@ -24,6 +24,95 @@ pub struct LoweredMethod {
     pub registers: u16,
     pub ins: u16,
     pub outs: u16,
+}
+pub struct LoweredEvents {
+    pub click: Option<LoweredMethod>,
+    pub list_select: Option<LoweredMethod>,
+    pub spinner_select: Option<LoweredMethod>,
+    pub nothing_selected: Option<LoweredMethod>,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn lower_events(
+    clicks: &[aic_ir::ClickHandler],
+    selects: &[aic_ir::SelectHandler],
+    target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>,
+    string_index: &dyn Fn(&str) -> Result<u16, DexError>,
+    strings: Option<StringLowering>,
+    ui: UiLowering,
+    state_fields: BTreeMap<String, (u16, Type)>,
+    view_fields: BTreeMap<String, u16>,
+    ready_fields: &BTreeMap<String, u16>,
+    persistence: Option<PersistenceLowering>,
+    preferences: &[Preference],
+    tables: &[Table],
+) -> Result<LoweredEvents, DexError> {
+    let click = (!clicks.is_empty())
+        .then(|| {
+            lower_on_click(
+                clicks,
+                target,
+                string_index,
+                strings,
+                ui,
+                state_fields.clone(),
+                view_fields.clone(),
+                persistence,
+                preferences,
+                tables,
+            )
+        })
+        .transpose()?;
+    let has_list = selects.iter().any(|h| !ready_fields.contains_key(&h.view));
+    let has_spinner = selects.iter().any(|h| ready_fields.contains_key(&h.view));
+    let list_select = has_list
+        .then(|| {
+            lower_on_select(
+                selects,
+                false,
+                target,
+                string_index,
+                strings,
+                ui,
+                state_fields.clone(),
+                view_fields.clone(),
+                ready_fields,
+                persistence,
+                preferences,
+                tables,
+            )
+        })
+        .transpose()?;
+    let spinner_select = has_spinner
+        .then(|| {
+            lower_on_select(
+                selects,
+                true,
+                target,
+                string_index,
+                strings,
+                ui,
+                state_fields,
+                view_fields,
+                ready_fields,
+                persistence,
+                preferences,
+                tables,
+            )
+        })
+        .transpose()?;
+    let nothing_selected = has_spinner.then(|| LoweredMethod {
+        code: assemble(&[Instruction::ReturnVoid]).expect("return-void assembles"),
+        registers: 2,
+        ins: 2,
+        outs: 0,
+    });
+    Ok(LoweredEvents {
+        click,
+        list_select,
+        spinner_select,
+        nothing_selected,
+    })
 }
 #[derive(Clone, Debug)]
 pub struct FunctionTarget {
@@ -54,6 +143,7 @@ pub struct UiLowering {
     pub text_view_type: u16,
     pub text_view_init: u16,
     pub text_view_set_text: u16,
+    pub text_view_set_text_size: u16,
     pub button_type: u16,
     pub button_init: u16,
     pub edit_text_type: u16,
@@ -62,15 +152,80 @@ pub struct UiLowering {
     pub edit_text_set_input_type: u16,
     pub scroll_view_type: u16,
     pub scroll_view_init: u16,
+    pub frame_layout_type: u16,
+    pub frame_layout_init: u16,
+    pub check_box_type: u16,
+    pub check_box_init: u16,
+    pub switch_type: u16,
+    pub switch_init: u16,
+    pub progress_bar_type: u16,
+    pub progress_bar_init: u16,
+    pub image_view_type: u16,
+    pub image_view_init: u16,
+    pub image_view_set_resource: u16,
+    pub toolbar_type: u16,
+    pub toolbar_init: u16,
+    pub toolbar_set_title: u16,
+    pub list_view_type: u16,
+    pub list_view_init: u16,
+    pub spinner_type: u16,
+    pub spinner_init: u16,
+    pub string_array_type: u16,
+    pub array_adapter_type: u16,
+    pub array_adapter_init: u16,
+    pub array_adapter_set_drop_down_view_resource: u16,
+    pub list_view_set_adapter: u16,
+    pub spinner_set_adapter: u16,
     pub set_on_click_listener: u16,
+    pub list_view_set_on_item_click_listener: u16,
+    pub spinner_set_on_item_selected_listener: u16,
+    pub adapter_view_get_item_at_position: u16,
+    pub object_to_string: u16,
     pub layout_params_type: u16,
     pub layout_params_init: u16,
+    pub layout_params_set_margins: u16,
     pub set_layout_params: u16,
     pub color_parse: u16,
     pub set_text_color: u16,
     pub set_background_color: u16,
     pub add_view: u16,
+    pub set_fits_system_windows: u16,
     pub set_content_view: u16,
+    pub intent_type: u16,
+    pub intent_init: u16,
+    pub intent_set_class_name: u16,
+    pub intent_put_i32: u16,
+    pub intent_put_bool: u16,
+    pub intent_put_string: u16,
+    pub start_activity: u16,
+    pub finish_activity: u16,
+    pub set_padding: u16,
+    pub set_visibility: u16,
+    pub set_enabled: u16,
+    pub set_content_description: u16,
+    pub set_important_for_accessibility: u16,
+    pub context_get_resources: u16,
+    pub resources_get_display_metrics: u16,
+    pub display_metrics_density_dpi: u16,
+    pub minimum_touch_target_field: u16,
+    pub set_minimum_width: u16,
+    pub set_minimum_height: u16,
+    pub generate_view_id: u16,
+    pub set_view_id: u16,
+    pub text_view_set_label_for: u16,
+    pub set_accessibility_heading: u16,
+    pub sdk_int_field: Option<u16>,
+    pub set_text_alignment: u16,
+    pub dialog_builder_type: u16,
+    pub dialog_builder_init: u16,
+    pub dialog_set_title: u16,
+    pub dialog_set_message: u16,
+    pub dialog_show: u16,
+    pub popup_menu_type: u16,
+    pub popup_menu_init: u16,
+    pub popup_menu_get_menu: u16,
+    pub menu_add: u16,
+    pub popup_menu_show: u16,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct PersistenceLowering {
@@ -105,6 +260,9 @@ struct Lowerer<'a> {
     locals: BTreeMap<String, Binding>,
     views: BTreeMap<String, Register>,
     state_fields: BTreeMap<String, (u16, Type)>,
+    collection_fields: BTreeMap<String, u16>,
+    selection_views: BTreeMap<String, bool>,
+    touch_target_views: BTreeSet<String>,
     view_fields: BTreeMap<String, u16>,
     this: Option<Register>,
     next: u8,
@@ -144,6 +302,111 @@ impl Lowerer<'_> {
         let l = Label(self.label);
         self.label += 1;
         l
+    }
+    fn release_temporaries(&mut self, candidate: u8) {
+        let live = self
+            .locals
+            .values()
+            .map(|binding| binding.register.index.saturating_add(1))
+            .chain(
+                self.views
+                    .values()
+                    .map(|register| register.index.saturating_add(1)),
+            )
+            .max()
+            .unwrap_or(0);
+        self.next = candidate.max(live);
+    }
+
+    fn initialize_minimum_touch_target(
+        &mut self,
+        context: Register,
+        ui: UiLowering,
+    ) -> Result<(), DexError> {
+        let target = self.alloc(Type::I32)?;
+        let resources = self.alloc(Type::String)?;
+        let metrics = self.alloc(Type::String)?;
+        let scratch = self.alloc(Type::I32)?;
+        self.code.push(Instruction::InvokeVirtual {
+            method: ui.context_get_resources,
+            args: vec![context],
+        });
+        self.code
+            .push(Instruction::MoveResultObject { dst: resources });
+        self.code.push(Instruction::InvokeVirtual {
+            method: ui.resources_get_display_metrics,
+            args: vec![resources],
+        });
+        self.code
+            .push(Instruction::MoveResultObject { dst: metrics });
+        self.code.push(Instruction::IGet {
+            dst: scratch,
+            object: metrics,
+            field: ui.display_metrics_density_dpi,
+        });
+        self.code.push(Instruction::Const16 {
+            dst: target,
+            value: 48,
+        });
+        self.code.push(Instruction::MulInt {
+            dst: target,
+            left: target,
+            right: scratch,
+        });
+        self.code.push(Instruction::Const16 {
+            dst: scratch,
+            value: 159,
+        });
+        self.code.push(Instruction::AddInt {
+            dst: target,
+            left: target,
+            right: scratch,
+        });
+        self.code.push(Instruction::Const16 {
+            dst: scratch,
+            value: 160,
+        });
+        self.code.push(Instruction::DivInt {
+            dst: target,
+            left: target,
+            right: scratch,
+        });
+        let this = self
+            .this
+            .ok_or(DexError::InvalidInput("missing Activity receiver"))?;
+        self.code.push(Instruction::IPut {
+            src: target,
+            object: this,
+            field: ui.minimum_touch_target_field,
+        });
+        self.outs = self.outs.max(2);
+        self.next = 0;
+        Ok(())
+    }
+
+    fn apply_minimum_touch_target(
+        &mut self,
+        view: Register,
+        ui: UiLowering,
+    ) -> Result<(), DexError> {
+        let target = self.alloc(Type::I32)?;
+        let this = self
+            .this
+            .ok_or(DexError::InvalidInput("missing Activity receiver"))?;
+        self.code.push(Instruction::IGet {
+            dst: target,
+            object: this,
+            field: ui.minimum_touch_target_field,
+        });
+        for method in [ui.set_minimum_width, ui.set_minimum_height] {
+            self.code.push(Instruction::InvokeVirtual {
+                method,
+                args: vec![view, target],
+            });
+        }
+        self.outs = self.outs.max(2);
+        self.release_temporaries(view.index + 1);
+        Ok(())
     }
     fn ty(&self, e: &Expression) -> Result<Type, DexError> {
         match &e.kind {
@@ -947,6 +1210,9 @@ pub fn lower_function(
         locals: BTreeMap::new(),
         views: BTreeMap::new(),
         state_fields: BTreeMap::new(),
+        collection_fields: BTreeMap::new(),
+        selection_views: BTreeMap::new(),
+        touch_target_views: BTreeSet::new(),
         view_fields: BTreeMap::new(),
         this: None,
         next: 0,
@@ -1000,6 +1266,9 @@ pub fn lower_function_typed(
         locals: BTreeMap::new(),
         views: BTreeMap::new(),
         state_fields: BTreeMap::new(),
+        collection_fields: BTreeMap::new(),
+        selection_views: BTreeMap::new(),
+        touch_target_views: BTreeSet::new(),
         view_fields: BTreeMap::new(),
         this: None,
         next: 0,
@@ -1036,6 +1305,40 @@ pub fn lower_function_typed(
 }
 
 impl Lowerer<'_> {
+    fn fill_string_array(
+        &mut self,
+        items: &[Expression],
+        array: Register,
+        array_type: u16,
+    ) -> Result<(), DexError> {
+        let size = self.alloc(Type::I32)?;
+        self.code.push(Instruction::Const16 {
+            dst: size,
+            value: i16::try_from(items.len()).map_err(|_| DexError::ArithmeticOverflow)?,
+        });
+        self.code.push(Instruction::NewArray {
+            dst: array,
+            size,
+            ty: array_type,
+        });
+        for (offset, item) in items.iter().enumerate() {
+            let value = self.alloc(Type::String)?;
+            let index = self.alloc(Type::I32)?;
+            self.expr(item, value)?;
+            self.code.push(Instruction::Const16 {
+                dst: index,
+                value: i16::try_from(offset).map_err(|_| DexError::ArithmeticOverflow)?,
+            });
+            self.code.push(Instruction::AputObject {
+                value,
+                array,
+                index,
+            });
+            self.release_temporaries(array.index + 1);
+        }
+        Ok(())
+    }
+
     fn on_create_statements(
         &mut self,
         statements: &[Statement],
@@ -1072,7 +1375,7 @@ impl Lowerer<'_> {
                             object: this,
                             field,
                         });
-                        self.next = register.index;
+                        self.release_temporaries(register.index);
                     }
                 }
                 StatementKind::If {
@@ -1160,7 +1463,7 @@ impl Lowerer<'_> {
                             field: *field,
                         });
                     }
-                    self.next = view.index + 1;
+                    self.release_temporaries(view.index + 1);
                 }
                 StatementKind::TextView { id, text } => {
                     let view = self.alloc(Type::String)?;
@@ -1187,7 +1490,7 @@ impl Lowerer<'_> {
                             field: *field,
                         });
                     }
-                    self.next = view.index + 1;
+                    self.release_temporaries(view.index + 1);
                 }
                 StatementKind::Button { id, text } => {
                     let view = self.alloc(Type::String)?;
@@ -1206,7 +1509,8 @@ impl Lowerer<'_> {
                         args: vec![view, rendered],
                     });
                     self.outs = self.outs.max(2);
-                    self.next = rendered.index;
+                    self.release_temporaries(rendered.index);
+                    self.apply_minimum_touch_target(view, ui)?;
                     self.views.insert(id.clone(), view);
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
@@ -1219,9 +1523,14 @@ impl Lowerer<'_> {
                         method: ui.set_on_click_listener,
                         args: vec![view, this],
                     });
-                    self.next = view.index + 1;
+                    self.release_temporaries(view.index + 1);
                 }
-                StatementKind::EditText { id, hint } | StatementKind::TextInput { id, hint } => {
+                StatementKind::EditText { id, hint }
+                | StatementKind::TextInput {
+                    id,
+                    hint,
+                    input_type: _,
+                } => {
                     let view = self.alloc(Type::String)?;
                     let rendered = self.alloc(Type::String)?;
                     self.code.push(Instruction::NewInstance {
@@ -1237,18 +1546,41 @@ impl Lowerer<'_> {
                         method: ui.edit_text_set_hint,
                         args: vec![view, rendered],
                     });
-                    if matches!(statement.kind, StatementKind::EditText { .. }) {
-                        let input_type = self.alloc(Type::I32)?;
-                        self.code.push(Instruction::Const4 {
-                            dst: input_type,
-                            value: 2,
-                        });
-                        self.code.push(Instruction::InvokeVirtual {
-                            method: ui.edit_text_set_input_type,
-                            args: vec![view, input_type],
-                        });
-                    }
+                    let input_type = self.alloc(Type::I32)?;
+                    let input_type_value = match &statement.kind {
+                        StatementKind::EditText { .. }
+                        | StatementKind::TextInput {
+                            input_type: aic_ir::InputType::Integer,
+                            ..
+                        } => 0x0000_0002,
+                        StatementKind::TextInput {
+                            input_type: aic_ir::InputType::Text,
+                            ..
+                        } => 0x0000_0001,
+                        StatementKind::TextInput {
+                            input_type: aic_ir::InputType::Email,
+                            ..
+                        } => 0x0000_0021,
+                        StatementKind::TextInput {
+                            input_type: aic_ir::InputType::Password,
+                            ..
+                        } => 0x0000_0081,
+                        StatementKind::TextInput {
+                            input_type: aic_ir::InputType::Phone,
+                            ..
+                        } => 0x0000_0003,
+                        _ => unreachable!(),
+                    };
+                    self.code.push(Instruction::Const32 {
+                        dst: input_type,
+                        value: input_type_value,
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.edit_text_set_input_type,
+                        args: vec![view, input_type],
+                    });
                     self.outs = self.outs.max(2);
+                    self.apply_minimum_touch_target(view, ui)?;
                     self.views.insert(id.clone(), view);
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
@@ -1257,7 +1589,7 @@ impl Lowerer<'_> {
                             field: *field,
                         });
                     }
-                    self.next = view.index + 1;
+                    self.release_temporaries(view.index + 1);
                 }
                 StatementKind::ScrollView { id } => {
                     let view = self.alloc(Type::String)?;
@@ -1279,6 +1611,230 @@ impl Lowerer<'_> {
                         });
                     }
                 }
+                StatementKind::FrameLayout { id }
+                | StatementKind::ProgressBar { id }
+                | StatementKind::ImageView { id, .. } => {
+                    let view = self.alloc(Type::String)?;
+                    let (ty, init) = match &statement.kind {
+                        StatementKind::FrameLayout { .. } => {
+                            (ui.frame_layout_type, ui.frame_layout_init)
+                        }
+                        StatementKind::ProgressBar { .. } => {
+                            (ui.progress_bar_type, ui.progress_bar_init)
+                        }
+                        _ => (ui.image_view_type, ui.image_view_init),
+                    };
+                    self.code.push(Instruction::NewInstance { dst: view, ty });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: init,
+                        args: vec![view, this],
+                    });
+                    if let StatementKind::ImageView { icon, .. } = &statement.kind {
+                        let resource = self.alloc(Type::I32)?;
+                        self.code.push(Instruction::Const32 {
+                            dst: resource,
+                            value: match icon {
+                                aic_ir::BuiltinIcon::Info => 0x0108_009b,
+                                aic_ir::BuiltinIcon::Warning => 0x0108_0027,
+                                aic_ir::BuiltinIcon::Delete => 0x0108_0040,
+                            },
+                        });
+                        self.code.push(Instruction::InvokeVirtual {
+                            method: ui.image_view_set_resource,
+                            args: vec![view, resource],
+                        });
+                    }
+                    self.outs = self.outs.max(2);
+                    self.views.insert(id.clone(), view);
+                    if let Some(field) = self.view_fields.get(id) {
+                        self.code.push(Instruction::IPut {
+                            src: view,
+                            object: this,
+                            field: *field,
+                        });
+                    }
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::CheckBox { id, text } | StatementKind::Switch { id, text } => {
+                    let view = self.alloc(Type::String)?;
+                    let rendered = self.alloc(Type::String)?;
+                    let (ty, init) = if matches!(statement.kind, StatementKind::CheckBox { .. }) {
+                        (ui.check_box_type, ui.check_box_init)
+                    } else {
+                        (ui.switch_type, ui.switch_init)
+                    };
+                    self.code.push(Instruction::NewInstance { dst: view, ty });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: init,
+                        args: vec![view, this],
+                    });
+                    self.expr(text, rendered)?;
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.text_view_set_text,
+                        args: vec![view, rendered],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.apply_minimum_touch_target(view, ui)?;
+                    self.views.insert(id.clone(), view);
+                    if let Some(field) = self.view_fields.get(id) {
+                        self.code.push(Instruction::IPut {
+                            src: view,
+                            object: this,
+                            field: *field,
+                        });
+                    }
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::Toolbar { id, title } => {
+                    let view = self.alloc(Type::String)?;
+                    let rendered = self.alloc(Type::String)?;
+                    self.code.push(Instruction::NewInstance {
+                        dst: view,
+                        ty: ui.toolbar_type,
+                    });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: ui.toolbar_init,
+                        args: vec![view, this],
+                    });
+                    self.expr(title, rendered)?;
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.toolbar_set_title,
+                        args: vec![view, rendered],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.apply_minimum_touch_target(view, ui)?;
+                    self.views.insert(id.clone(), view);
+                    if let Some(field) = self.view_fields.get(id) {
+                        self.code.push(Instruction::IPut {
+                            src: view,
+                            object: this,
+                            field: *field,
+                        });
+                    }
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::ListView { id, items } => {
+                    let view = self.alloc(Type::String)?;
+                    let array = self.alloc(Type::String)?;
+                    self.code.push(Instruction::NewInstance {
+                        dst: view,
+                        ty: ui.list_view_type,
+                    });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: ui.list_view_init,
+                        args: vec![view, this],
+                    });
+                    match items {
+                        CollectionItems::Inline(items) => {
+                            self.fill_string_array(items, array, ui.string_array_type)?
+                        }
+                        CollectionItems::State(name) => self.code.push(Instruction::IGet {
+                            dst: array,
+                            object: this,
+                            field: self.collection_fields[name],
+                        }),
+                    }
+                    let adapter = self.alloc(Type::String)?;
+                    let layout = self.alloc(Type::I32)?;
+                    self.code.push(Instruction::NewInstance {
+                        dst: adapter,
+                        ty: ui.array_adapter_type,
+                    });
+                    self.code.push(Instruction::Const32 {
+                        dst: layout,
+                        value: 0x0109_0006,
+                    });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: ui.array_adapter_init,
+                        args: vec![adapter, this, layout, array],
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.list_view_set_adapter,
+                        args: vec![view, adapter],
+                    });
+                    self.outs = self.outs.max(4);
+                    self.apply_minimum_touch_target(view, ui)?;
+                    self.views.insert(id.clone(), view);
+                    if let Some(field) = self.view_fields.get(id) {
+                        self.code.push(Instruction::IPut {
+                            src: view,
+                            object: this,
+                            field: *field,
+                        });
+                    }
+                    if self.selection_views.get(id) == Some(&false) {
+                        self.code.push(Instruction::InvokeVirtual {
+                            method: ui.list_view_set_on_item_click_listener,
+                            args: vec![view, this],
+                        });
+                    }
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::Spinner { id, items } => {
+                    let view = self.alloc(Type::String)?;
+                    let array = self.alloc(Type::String)?;
+                    self.code.push(Instruction::NewInstance {
+                        dst: view,
+                        ty: ui.spinner_type,
+                    });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: ui.spinner_init,
+                        args: vec![view, this],
+                    });
+                    match items {
+                        CollectionItems::Inline(items) => {
+                            self.fill_string_array(items, array, ui.string_array_type)?
+                        }
+                        CollectionItems::State(name) => self.code.push(Instruction::IGet {
+                            dst: array,
+                            object: this,
+                            field: self.collection_fields[name],
+                        }),
+                    }
+                    let adapter = self.alloc(Type::String)?;
+                    let layout = self.alloc(Type::I32)?;
+                    self.code.push(Instruction::NewInstance {
+                        dst: adapter,
+                        ty: ui.array_adapter_type,
+                    });
+                    self.code.push(Instruction::Const32 {
+                        dst: layout,
+                        value: 0x0109_0008,
+                    });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: ui.array_adapter_init,
+                        args: vec![adapter, this, layout, array],
+                    });
+                    self.code.push(Instruction::Const32 {
+                        dst: layout,
+                        value: 0x0109_0009,
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.array_adapter_set_drop_down_view_resource,
+                        args: vec![adapter, layout],
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.spinner_set_adapter,
+                        args: vec![view, adapter],
+                    });
+                    self.outs = self.outs.max(4);
+                    self.apply_minimum_touch_target(view, ui)?;
+                    self.views.insert(id.clone(), view);
+                    if let Some(field) = self.view_fields.get(id) {
+                        self.code.push(Instruction::IPut {
+                            src: view,
+                            object: this,
+                            field: *field,
+                        });
+                    }
+                    if self.selection_views.get(id) == Some(&true) {
+                        self.code.push(Instruction::InvokeVirtual {
+                            method: ui.spinner_set_on_item_selected_listener,
+                            args: vec![view, this],
+                        });
+                    }
+                    self.release_temporaries(view.index + 1);
+                }
                 StatementKind::AddView { parent, child } => {
                     let parent = *self
                         .views
@@ -1299,6 +1855,15 @@ impl Lowerer<'_> {
                         .views
                         .get(view)
                         .ok_or(DexError::InvalidInput("missing Android content view ID"))?;
+                    let enabled = self.alloc(Type::Bool)?;
+                    self.code.push(Instruction::Const4 {
+                        dst: enabled,
+                        value: 1,
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_fits_system_windows,
+                        args: vec![view, enabled],
+                    });
                     self.code.push(Instruction::InvokeVirtual {
                         method: ui.set_content_view,
                         args: vec![this, view],
@@ -1328,14 +1893,40 @@ impl Lowerer<'_> {
                         args: vec![view, rendered],
                     });
                     self.outs = self.outs.max(2);
-                    self.next = rendered.index;
+                    self.release_temporaries(rendered.index);
+                }
+                StatementKind::SetTextSize { view, size_sp } => {
+                    let view = self.load_view(view, this)?;
+                    let unit = self.alloc(Type::I32)?;
+                    let size = self.alloc(Type::I32)?;
+                    let size_bits = f32::from(
+                        i16::try_from(*size_sp).map_err(|_| DexError::ArithmeticOverflow)?,
+                    )
+                    .to_bits()
+                    .cast_signed();
+                    self.code.push(Instruction::Const4 {
+                        dst: unit,
+                        value: 2,
+                    });
+                    self.code.push(Instruction::Const32 {
+                        dst: size,
+                        value: size_bits,
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.text_view_set_text_size,
+                        args: vec![view, unit, size],
+                    });
+                    self.outs = self.outs.max(3);
+                    self.release_temporaries(view.index + 1);
                 }
                 StatementKind::SetLayout {
                     view,
                     width,
                     height,
                     weight,
+                    margins,
                 } => {
+                    let enforces_touch_target = self.touch_target_views.contains(view);
                     let view = *self
                         .views
                         .get(view)
@@ -1349,14 +1940,44 @@ impl Lowerer<'_> {
                         ty: ui.layout_params_type,
                     });
                     for (register, size) in [(w, width), (h, height)] {
-                        self.code.push(Instruction::Const4 {
-                            dst: register,
-                            value: if *size == aic_ir::LayoutSize::MatchParent {
-                                -1
-                            } else {
-                                -2
-                            },
-                        });
+                        match size {
+                            aic_ir::LayoutSize::MatchParent => {
+                                self.code.push(Instruction::Const4 {
+                                    dst: register,
+                                    value: -1,
+                                })
+                            }
+                            aic_ir::LayoutSize::WrapContent => {
+                                self.code.push(Instruction::Const4 {
+                                    dst: register,
+                                    value: -2,
+                                })
+                            }
+                            aic_ir::LayoutSize::Dp(value) => {
+                                self.code.push(Instruction::Const32 {
+                                    dst: register,
+                                    value: *value,
+                                });
+                                if enforces_touch_target {
+                                    let done = self.label();
+                                    self.code.push(Instruction::IGet {
+                                        dst: weight_register,
+                                        object: this,
+                                        field: ui.minimum_touch_target_field,
+                                    });
+                                    self.code.push(Instruction::IfGe {
+                                        left: register,
+                                        right: weight_register,
+                                        target: done,
+                                    });
+                                    self.code.push(Instruction::Move {
+                                        dst: register,
+                                        src: weight_register,
+                                    });
+                                    self.code.push(Instruction::Label(done));
+                                }
+                            }
+                        }
                     }
                     self.code.push(Instruction::Const32 {
                         dst: weight_register,
@@ -1366,12 +1987,27 @@ impl Lowerer<'_> {
                         method: ui.layout_params_init,
                         args: vec![params, w, h, weight_register],
                     });
+                    if margins.iter().any(|margin| *margin != 0) {
+                        let mut margin_args = vec![params];
+                        for margin in margins {
+                            let register = self.alloc(Type::I32)?;
+                            self.code.push(Instruction::Const32 {
+                                dst: register,
+                                value: *margin,
+                            });
+                            margin_args.push(register);
+                        }
+                        self.code.push(Instruction::InvokeVirtual {
+                            method: ui.layout_params_set_margins,
+                            args: margin_args,
+                        });
+                    }
                     self.code.push(Instruction::InvokeVirtual {
                         method: ui.set_layout_params,
                         args: vec![view, params],
                     });
-                    self.outs = self.outs.max(4);
-                    self.next = params.index;
+                    self.outs = self.outs.max(5);
+                    self.release_temporaries(params.index);
                 }
                 StatementKind::SetTextColor { view, color }
                 | StatementKind::SetBackgroundColor { view, color } => {
@@ -1403,7 +2039,273 @@ impl Lowerer<'_> {
                         args: vec![view, parsed],
                     });
                     self.outs = self.outs.max(2);
-                    self.next = text.index;
+                    self.release_temporaries(text.index);
+                }
+                StatementKind::StartActivity { activity, extras } => {
+                    let intent = self.alloc(Type::String)?;
+                    let target = self.alloc(Type::String)?;
+                    self.code.push(Instruction::NewInstance {
+                        dst: intent,
+                        ty: ui.intent_type,
+                    });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: ui.intent_init,
+                        args: vec![intent],
+                    });
+                    self.code.push(Instruction::ConstString {
+                        dst: target,
+                        string: self
+                            .string_index
+                            .ok_or(DexError::InvalidInput("missing activity string index"))?(
+                            activity,
+                        )?,
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.intent_set_class_name,
+                        args: vec![intent, this, target],
+                    });
+                    for (key, value) in extras {
+                        let key_register = self.alloc(Type::String)?;
+                        self.code.push(Instruction::ConstString {
+                            dst: key_register,
+                            string: self.string_index.ok_or(DexError::InvalidInput(
+                                "missing navigation extra key index",
+                            ))?(key)?,
+                        });
+                        let value_register = self.alloc(self.ty(value)?)?;
+                        self.expr(value, value_register)?;
+                        self.code.push(Instruction::InvokeVirtual {
+                            method: match self.ty(value)? {
+                                Type::I32 => ui.intent_put_i32,
+                                Type::Bool => ui.intent_put_bool,
+                                Type::String => ui.intent_put_string,
+                            },
+                            args: vec![intent, key_register, value_register],
+                        });
+                        self.outs = self.outs.max(3);
+                        self.release_temporaries(key_register.index);
+                    }
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.start_activity,
+                        args: vec![this, intent],
+                    });
+                    self.outs = self.outs.max(3);
+                    self.release_temporaries(intent.index);
+                }
+                StatementKind::FinishActivity => {
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.finish_activity,
+                        args: vec![this],
+                    });
+                    self.outs = self.outs.max(1);
+                }
+                StatementKind::SetPadding {
+                    view,
+                    left,
+                    top,
+                    right,
+                    bottom,
+                } => {
+                    let view = self.load_view(view, this)?;
+                    let mut args = vec![view];
+                    for value in [left, top, right, bottom] {
+                        let r = self.alloc(Type::I32)?;
+                        self.code.push(Instruction::Const32 {
+                            dst: r,
+                            value: *value,
+                        });
+                        args.push(r);
+                    }
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_padding,
+                        args,
+                    });
+                    self.outs = self.outs.max(5);
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::SetVisibility { view, visibility } => {
+                    let view = self.load_view(view, this)?;
+                    let value = self.alloc(Type::I32)?;
+                    self.code.push(Instruction::Const32 {
+                        dst: value,
+                        value: match visibility {
+                            aic_ir::Visibility::Visible => 0,
+                            aic_ir::Visibility::Invisible => 4,
+                            aic_ir::Visibility::Gone => 8,
+                        },
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_visibility,
+                        args: vec![view, value],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::SetEnabled { view, enabled } => {
+                    let view = self.load_view(view, this)?;
+                    let value = self.alloc(Type::Bool)?;
+                    self.expr(enabled, value)?;
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_enabled,
+                        args: vec![view, value],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::SetContentDescription { view, text } => {
+                    let view = self.load_view(view, this)?;
+                    let value = self.alloc(Type::String)?;
+                    self.expr(text, value)?;
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_content_description,
+                        args: vec![view, value],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::SetDecorative { view } => {
+                    let view = self.load_view(view, this)?;
+                    let value = self.alloc(Type::I32)?;
+                    self.code.push(Instruction::Const32 {
+                        dst: value,
+                        value: 2,
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_important_for_accessibility,
+                        args: vec![view, value],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::SetInputLabel { label, input } => {
+                    let label = self.load_view(label, this)?;
+                    let input = self.load_view(input, this)?;
+                    let id = self.alloc(Type::I32)?;
+                    self.code.push(Instruction::InvokeStatic {
+                        method: ui.generate_view_id,
+                        args: vec![],
+                    });
+                    self.code.push(Instruction::MoveResult { dst: id });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_view_id,
+                        args: vec![input, id],
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.text_view_set_label_for,
+                        args: vec![label, id],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(label.index + 1);
+                }
+                StatementKind::SetHeading { view } => {
+                    let view = self.load_view(view, this)?;
+                    let enabled = self.alloc(Type::Bool)?;
+                    let sdk = self.alloc(Type::I32)?;
+                    let api_28 = self.alloc(Type::I32)?;
+                    let done = self.label();
+                    self.code.push(Instruction::SGet {
+                        dst: sdk,
+                        field: ui
+                            .sdk_int_field
+                            .ok_or(DexError::InvalidInput("missing Android SDK level field"))?,
+                    });
+                    self.code.push(Instruction::Const16 {
+                        dst: api_28,
+                        value: 28,
+                    });
+                    self.code.push(Instruction::IfLt {
+                        left: sdk,
+                        right: api_28,
+                        target: done,
+                    });
+                    self.code.push(Instruction::Const4 {
+                        dst: enabled,
+                        value: 1,
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_accessibility_heading,
+                        args: vec![view, enabled],
+                    });
+                    self.code.push(Instruction::Label(done));
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::SetGravity { view, gravity } => {
+                    let view = self.load_view(view, this)?;
+                    let value = self.alloc(Type::I32)?;
+                    self.code.push(Instruction::Const4 {
+                        dst: value,
+                        value: match gravity {
+                            aic_ir::Gravity::Start => 2,
+                            aic_ir::Gravity::Center => 4,
+                            aic_ir::Gravity::End => 6,
+                        },
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.set_text_alignment,
+                        args: vec![view, value],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(view.index + 1);
+                }
+                StatementKind::ShowDialog { title, message } => {
+                    let builder = self.alloc(Type::String)?;
+                    let title_value = self.alloc(Type::String)?;
+                    let message_value = self.alloc(Type::String)?;
+                    self.code.push(Instruction::NewInstance {
+                        dst: builder,
+                        ty: ui.dialog_builder_type,
+                    });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: ui.dialog_builder_init,
+                        args: vec![builder, this],
+                    });
+                    self.expr(title, title_value)?;
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.dialog_set_title,
+                        args: vec![builder, title_value],
+                    });
+                    self.expr(message, message_value)?;
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.dialog_set_message,
+                        args: vec![builder, message_value],
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.dialog_show,
+                        args: vec![builder],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(builder.index);
+                }
+                StatementKind::ShowMenu { anchor, item } => {
+                    let anchor = self.load_view(anchor, this)?;
+                    let popup = self.alloc(Type::String)?;
+                    let menu = self.alloc(Type::String)?;
+                    let item_value = self.alloc(Type::String)?;
+                    self.code.push(Instruction::NewInstance {
+                        dst: popup,
+                        ty: ui.popup_menu_type,
+                    });
+                    self.code.push(Instruction::InvokeDirect {
+                        method: ui.popup_menu_init,
+                        args: vec![popup, this, anchor],
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.popup_menu_get_menu,
+                        args: vec![popup],
+                    });
+                    self.code.push(Instruction::MoveResultObject { dst: menu });
+                    self.expr(item, item_value)?;
+                    self.code.push(Instruction::InvokeInterface {
+                        method: ui.menu_add,
+                        args: vec![menu, item_value],
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.popup_menu_show,
+                        args: vec![popup],
+                    });
+                    self.outs = self.outs.max(3);
+                    self.release_temporaries(anchor.index + 1);
                 }
                 StatementKind::PreferenceSet { key, value } => {
                     let saved = self.next;
@@ -1426,6 +2328,22 @@ impl Lowerer<'_> {
             }
         }
         Ok(())
+    }
+    fn load_view(&mut self, name: &str, this: Register) -> Result<Register, DexError> {
+        if let Some(view) = self.views.get(name) {
+            return Ok(*view);
+        }
+        let view = self.alloc(Type::String)?;
+        let field = *self
+            .view_fields
+            .get(name)
+            .ok_or(DexError::InvalidInput("missing Android view ID"))?;
+        self.code.push(Instruction::IGet {
+            dst: view,
+            object: this,
+            field,
+        });
+        Ok(view)
     }
     fn preference_set(&mut self, key: &str, value: &Expression) -> Result<(), DexError> {
         let p = self
@@ -1548,6 +2466,9 @@ pub fn lower_on_click(
         locals: BTreeMap::new(),
         views: BTreeMap::new(),
         state_fields,
+        collection_fields: BTreeMap::new(),
+        selection_views: BTreeMap::new(),
+        touch_target_views: BTreeSet::new(),
         view_fields,
         this: Some(this),
         next: 0,
@@ -1593,6 +2514,152 @@ pub fn lower_on_click(
 }
 
 #[allow(clippy::too_many_arguments)]
+pub fn lower_on_select(
+    handlers: &[aic_ir::SelectHandler],
+    spinner: bool,
+    target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>,
+    string_index: &dyn Fn(&str) -> Result<u16, DexError>,
+    strings: Option<StringLowering>,
+    ui: UiLowering,
+    state_fields: BTreeMap<String, (u16, Type)>,
+    view_fields: BTreeMap<String, u16>,
+    ready_fields: &BTreeMap<String, u16>,
+    persistence: Option<PersistenceLowering>,
+    preferences: &[Preference],
+    tables: &[Table],
+) -> Result<LoweredMethod, DexError> {
+    let fallback = |name: &str| Ok(target(name)?.method);
+    let this = Register {
+        index: 10,
+        kind: ValueKind::Reference,
+    };
+    let parent = Register {
+        index: 11,
+        kind: ValueKind::Reference,
+    };
+    let position = Register {
+        index: 13,
+        kind: ValueKind::I32,
+    };
+    let mut lowerer = Lowerer {
+        code: vec![],
+        locals: BTreeMap::new(),
+        views: BTreeMap::new(),
+        state_fields,
+        collection_fields: BTreeMap::new(),
+        selection_views: BTreeMap::new(),
+        touch_target_views: BTreeSet::new(),
+        view_fields,
+        this: Some(this),
+        next: 0,
+        limit: 10,
+        label: 0,
+        resolve: &fallback,
+        target: Some(target),
+        string_index: Some(string_index),
+        strings,
+        persistence,
+        preferences: preferences
+            .iter()
+            .map(|p| (p.name.clone(), p.clone()))
+            .collect(),
+        tables: tables.iter().map(|t| (t.name.clone(), t.clone())).collect(),
+        outs: 0,
+    };
+    for handler in handlers {
+        let is_spinner = ready_fields.contains_key(&handler.view);
+        if is_spinner != spinner {
+            continue;
+        }
+        lowerer.next = 0;
+        let next = lowerer.label();
+        let target_view = lowerer.alloc(Type::String)?;
+        let view_field = *lowerer
+            .view_fields
+            .get(&handler.view)
+            .ok_or(DexError::InvalidInput("missing selection view field"))?;
+        lowerer.code.push(Instruction::IGet {
+            dst: target_view,
+            object: this,
+            field: view_field,
+        });
+        lowerer.code.push(Instruction::IfNe {
+            left: parent,
+            right: target_view,
+            target: next,
+        });
+        if spinner {
+            let ready = lowerer.alloc(Type::Bool)?;
+            let one = lowerer.alloc(Type::Bool)?;
+            let arm = lowerer.label();
+            let body = lowerer.label();
+            lowerer.code.push(Instruction::IGet {
+                dst: ready,
+                object: this,
+                field: ready_fields[&handler.view],
+            });
+            lowerer
+                .code
+                .push(Instruction::Const4 { dst: one, value: 1 });
+            lowerer.code.push(Instruction::IfNe {
+                left: ready,
+                right: one,
+                target: arm,
+            });
+            lowerer.code.push(Instruction::Goto16 { target: body });
+            lowerer.code.push(Instruction::Label(arm));
+            lowerer.code.push(Instruction::IPut {
+                src: one,
+                object: this,
+                field: ready_fields[&handler.view],
+            });
+            lowerer.code.push(Instruction::ReturnVoid);
+            lowerer.code.push(Instruction::Label(body));
+        }
+        let object = lowerer.alloc(Type::String)?;
+        let value = lowerer.alloc(Type::String)?;
+        lowerer.code.push(Instruction::InvokeVirtual {
+            method: ui.adapter_view_get_item_at_position,
+            args: vec![parent, position],
+        });
+        lowerer
+            .code
+            .push(Instruction::MoveResultObject { dst: object });
+        lowerer.code.push(Instruction::InvokeVirtual {
+            method: ui.object_to_string,
+            args: vec![object],
+        });
+        lowerer
+            .code
+            .push(Instruction::MoveResultObject { dst: value });
+        lowerer.locals.insert(
+            handler.index.clone(),
+            Binding {
+                register: position,
+                ty: Type::I32,
+            },
+        );
+        lowerer.locals.insert(
+            handler.value.clone(),
+            Binding {
+                register: value,
+                ty: Type::String,
+            },
+        );
+        lowerer.on_create_statements(&handler.body, this, ui)?;
+        lowerer.code.push(Instruction::ReturnVoid);
+        lowerer.code.push(Instruction::Label(next));
+    }
+    lowerer.code.push(Instruction::ReturnVoid);
+    Ok(LoweredMethod {
+        code: assemble(&lowerer.code)?,
+        registers: 16,
+        ins: 6,
+        outs: lowerer.outs,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn lower_on_create(
     statements: &[Statement],
     target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>,
@@ -1600,13 +2667,30 @@ pub fn lower_on_create(
     strings: Option<StringLowering>,
     ui: UiLowering,
     state_fields: BTreeMap<String, (u16, Type)>,
+    collection_fields: BTreeMap<String, u16>,
+    selection_views: BTreeMap<String, bool>,
     view_fields: BTreeMap<String, u16>,
     states: &[aic_ir::State],
+    string_collections: &[aic_ir::StringCollectionState],
     persistence: Option<PersistenceLowering>,
     preferences: &[Preference],
     tables: &[Table],
 ) -> Result<LoweredMethod, DexError> {
     let fallback = |name: &str| Ok(target(name)?.method);
+    let touch_target_views = statements
+        .iter()
+        .filter_map(|statement| match &statement.kind {
+            StatementKind::Button { id, .. }
+            | StatementKind::EditText { id, .. }
+            | StatementKind::TextInput { id, .. }
+            | StatementKind::CheckBox { id, .. }
+            | StatementKind::Switch { id, .. }
+            | StatementKind::Toolbar { id, .. }
+            | StatementKind::ListView { id, .. }
+            | StatementKind::Spinner { id, .. } => Some(id.clone()),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
     let this = Register {
         index: 14,
         kind: ValueKind::Reference,
@@ -1623,6 +2707,9 @@ pub fn lower_on_create(
         locals: BTreeMap::new(),
         views: BTreeMap::new(),
         state_fields,
+        collection_fields,
+        selection_views,
+        touch_target_views,
         view_fields,
         this: Some(this),
         next: 0,
@@ -1722,6 +2809,44 @@ pub fn lower_on_create(
             field,
         });
         lowerer.next = 0;
+    }
+    for collection in string_collections {
+        let size = lowerer.alloc(Type::I32)?;
+        let array = lowerer.alloc(Type::String)?;
+        lowerer.code.push(Instruction::Const16 {
+            dst: size,
+            value: i16::try_from(collection.items.len())
+                .map_err(|_| DexError::ArithmeticOverflow)?,
+        });
+        lowerer.code.push(Instruction::NewArray {
+            dst: array,
+            size,
+            ty: ui.string_array_type,
+        });
+        for (offset, item) in collection.items.iter().enumerate() {
+            let value = lowerer.alloc(Type::String)?;
+            let index = lowerer.alloc(Type::I32)?;
+            lowerer.expr(item, value)?;
+            lowerer.code.push(Instruction::Const16 {
+                dst: index,
+                value: i16::try_from(offset).map_err(|_| DexError::ArithmeticOverflow)?,
+            });
+            lowerer.code.push(Instruction::AputObject {
+                value,
+                array,
+                index,
+            });
+            lowerer.release_temporaries(array.index + 1);
+        }
+        lowerer.code.push(Instruction::IPut {
+            src: array,
+            object: this,
+            field: lowerer.collection_fields[&collection.name],
+        });
+        lowerer.next = 0;
+    }
+    if !lowerer.touch_target_views.is_empty() {
+        lowerer.initialize_minimum_touch_target(this, ui)?;
     }
     lowerer.on_create_statements(statements, this, ui)?;
     lowerer.code.push(Instruction::ReturnVoid);

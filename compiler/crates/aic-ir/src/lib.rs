@@ -226,9 +226,40 @@ pub enum StatementKind {
     TextInput {
         id: String,
         hint: Expression,
+        input_type: InputType,
     },
     ScrollView {
         id: String,
+    },
+    FrameLayout {
+        id: String,
+    },
+    CheckBox {
+        id: String,
+        text: Expression,
+    },
+    Switch {
+        id: String,
+        text: Expression,
+    },
+    ProgressBar {
+        id: String,
+    },
+    ImageView {
+        id: String,
+        icon: BuiltinIcon,
+    },
+    Toolbar {
+        id: String,
+        title: Expression,
+    },
+    ListView {
+        id: String,
+        items: CollectionItems,
+    },
+    Spinner {
+        id: String,
+        items: CollectionItems,
     },
     AddView {
         parent: String,
@@ -241,11 +272,16 @@ pub enum StatementKind {
         view: String,
         text: Expression,
     },
+    SetTextSize {
+        view: String,
+        size_sp: i32,
+    },
     SetLayout {
         view: String,
         width: LayoutSize,
         height: LayoutSize,
         weight: i32,
+        margins: [i32; 4],
     },
     SetTextColor {
         view: String,
@@ -254,6 +290,52 @@ pub enum StatementKind {
     SetBackgroundColor {
         view: String,
         color: String,
+    },
+    StartActivity {
+        activity: String,
+        extras: Vec<(String, Expression)>,
+    },
+    FinishActivity,
+    SetPadding {
+        view: String,
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+    },
+    SetVisibility {
+        view: String,
+        visibility: Visibility,
+    },
+    SetEnabled {
+        view: String,
+        enabled: Expression,
+    },
+    SetContentDescription {
+        view: String,
+        text: Expression,
+    },
+    SetDecorative {
+        view: String,
+    },
+    SetInputLabel {
+        label: String,
+        input: String,
+    },
+    SetHeading {
+        view: String,
+    },
+    SetGravity {
+        view: String,
+        gravity: Gravity,
+    },
+    ShowDialog {
+        title: Expression,
+        message: Expression,
+    },
+    ShowMenu {
+        anchor: String,
+        item: Expression,
     },
     PreferenceSet {
         key: String,
@@ -321,12 +403,58 @@ pub enum Orientation {
 pub enum LayoutSize {
     MatchParent,
     WrapContent,
+    Dp(i32),
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Visibility {
+    Visible,
+    Invisible,
+    Gone,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Gravity {
+    Start,
+    Center,
+    End,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BuiltinIcon {
+    Info,
+    Warning,
+    Delete,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum InputType {
+    Text,
+    Email,
+    Password,
+    Phone,
+    Integer,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
     pub name: String,
     pub ty: Type,
     pub initial: Expression,
+    pub span: SourceSpan,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StringCollectionState {
+    pub name: String,
+    pub items: Vec<Expression>,
+    pub span: SourceSpan,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CollectionItems {
+    Inline(Vec<Expression>),
+    State(String),
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SelectHandler {
+    pub view: String,
+    pub index: String,
+    pub value: String,
+    pub body: Vec<Statement>,
     pub span: SourceSpan,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -353,8 +481,10 @@ pub struct SyntaxFunction {
 pub struct SyntaxActivity {
     pub name: String,
     pub state: Vec<State>,
+    pub string_collections: Vec<StringCollectionState>,
     pub on_create: Vec<Statement>,
     pub on_click: Vec<ClickHandler>,
+    pub on_select: Vec<SelectHandler>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SyntaxProgram {
@@ -366,6 +496,7 @@ pub struct SyntaxProgram {
     pub database: Option<Database>,
     pub functions: Vec<SyntaxFunction>,
     pub activity: SyntaxActivity,
+    pub activities: Vec<SyntaxActivity>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Function {
@@ -379,8 +510,10 @@ pub struct Function {
 pub struct Activity {
     pub name: String,
     pub state: Vec<State>,
+    pub string_collections: Vec<StringCollectionState>,
     pub on_create: Vec<Statement>,
     pub on_click: Vec<ClickHandler>,
+    pub on_select: Vec<SelectHandler>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Program {
@@ -392,6 +525,7 @@ pub struct Program {
     pub database: Option<Database>,
     pub functions: Vec<Function>,
     pub activity: Activity,
+    pub activities: Vec<Activity>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -565,6 +699,8 @@ fn lex(src: &str) -> Result<Vec<Tok>, Diagnostic> {
             '}' => "}",
             '(' => "(",
             ')' => ")",
+            '[' => "[",
+            ']' => "]",
             ':' => ":",
             ',' => ",",
             '=' => "=",
@@ -662,18 +798,22 @@ impl Parser {
             return Err(Diagnostic::at(
                 "AIC1005",
                 n.s,
-                "only version 0.1 is supported",
+                "only versions 0.1 and 0.2 are supported",
             ));
         }
         self.sym(".")?;
         let n = self.pop();
-        if n.k != K::Int(1) {
-            return Err(Diagnostic::at(
-                "AIC1005",
-                n.s,
-                "only version 0.1 is supported",
-            ));
-        }
+        let minor = match n.k {
+            K::Int(1) => 1,
+            K::Int(2) => 2,
+            _ => {
+                return Err(Diagnostic::at(
+                    "AIC1005",
+                    n.s,
+                    "only versions 0.1 and 0.2 are supported",
+                ));
+            }
+        };
         self.word("app")?;
         let label = self.string()?;
         self.word("package")?;
@@ -750,26 +890,72 @@ impl Parser {
         while matches!(&self.cur().k,K::Word(v)if v=="fn") {
             functions.push(self.function()?)
         }
+        let first_activity = self.activity()?;
+        let mut activities = vec![first_activity.clone()];
+        while matches!(&self.cur().k,K::Word(v)if v=="activity") {
+            activities.push(self.activity()?);
+        }
+        self.sym("}")?;
+        if self.cur().k != K::Eof {
+            return Err(Diagnostic::at("AIC1006", self.cur().s, "content after app"));
+        }
+        Ok(SyntaxProgram {
+            version: format!("0.{minor}"),
+            label,
+            package,
+            capabilities,
+            preferences,
+            database,
+            functions,
+            activity: first_activity,
+            activities,
+        })
+    }
+    fn activity(&mut self) -> Result<SyntaxActivity, Diagnostic> {
         self.word("activity")?;
         let (name, _) = self.id()?;
         self.sym("{")?;
         let mut state = vec![];
+        let mut string_collections = vec![];
         while matches!(&self.cur().k,K::Word(v)if v=="state") {
             let start = self.pop().s.start;
             let (name, _) = self.id()?;
             self.sym(":")?;
             let ty = self.ty()?;
+            let is_collection = ty == Type::String && self.cur().k == K::Sym("[");
+            if is_collection {
+                self.pop();
+                self.sym("]")?;
+            }
             self.sym("=")?;
-            let initial = self.expr(0)?;
-            state.push(State {
-                name,
-                ty,
-                initial,
-                span: SourceSpan {
-                    start,
-                    end: self.t[self.i - 1].s.end,
-                },
-            });
+            if is_collection {
+                self.sym("[")?;
+                let mut items = Vec::new();
+                while self.cur().k != K::Sym("]") {
+                    items.push(self.expr(0)?);
+                    if self.cur().k != K::Sym(",") {
+                        break;
+                    }
+                    self.pop();
+                }
+                let end = self.sym("]")?.s.end;
+                string_collections.push(StringCollectionState {
+                    name,
+                    items,
+                    span: SourceSpan { start, end },
+                });
+            } else {
+                let initial = self.expr(0)?;
+                state.push(State {
+                    name,
+                    ty,
+                    initial,
+                    span: SourceSpan {
+                        start,
+                        end: self.t[self.i - 1].s.end,
+                    },
+                });
+            }
         }
         self.word("on_create")?;
         let on_create = self.block()?;
@@ -789,25 +975,36 @@ impl Parser {
                 },
             });
         }
-        self.sym("}")?;
-        self.sym("}")?;
-        if self.cur().k != K::Eof {
-            return Err(Diagnostic::at("AIC1006", self.cur().s, "content after app"));
+        let mut on_select = vec![];
+        while matches!(&self.cur().k,K::Word(v)if v=="on_select") {
+            let start = self.pop().s.start;
+            self.sym("(")?;
+            let (view, _) = self.id()?;
+            self.sym(",")?;
+            let (index, _) = self.id()?;
+            self.sym(",")?;
+            let (value, _) = self.id()?;
+            self.sym(")")?;
+            let body = self.block()?;
+            on_select.push(SelectHandler {
+                view,
+                index,
+                value,
+                body,
+                span: SourceSpan {
+                    start,
+                    end: self.t[self.i - 1].s.end,
+                },
+            });
         }
-        Ok(SyntaxProgram {
-            version: "0.1".into(),
-            label,
-            package,
-            capabilities,
-            preferences,
-            database,
-            functions,
-            activity: SyntaxActivity {
-                name,
-                state,
-                on_create,
-                on_click,
-            },
+        self.sym("}")?;
+        Ok(SyntaxActivity {
+            name,
+            state,
+            string_collections,
+            on_create,
+            on_click,
+            on_select,
         })
     }
     fn database(&mut self) -> Result<Database, Diagnostic> {
@@ -992,12 +1189,98 @@ impl Parser {
                             "text_input" => {
                                 self.word("hint")?;
                                 self.sym(":")?;
+                                let hint = self.expr(0)?;
+                                let input_type = if self.cur().k == K::Sym(",") {
+                                    self.pop();
+                                    self.word("input_type")?;
+                                    self.sym(":")?;
+                                    let (value, span) = self.id()?;
+                                    match value.as_str() {
+                                        "text" => InputType::Text,
+                                        "email" => InputType::Email,
+                                        "password" => InputType::Password,
+                                        "phone" => InputType::Phone,
+                                        "integer" => InputType::Integer,
+                                        _ => {
+                                            return Err(Diagnostic::at(
+                                                "AIC1417",
+                                                span,
+                                                "input_type must be text, email, password, phone, or integer",
+                                            ))
+                                        }
+                                    }
+                                } else {
+                                    InputType::Text
+                                };
                                 StatementKind::TextInput {
                                     id: name,
-                                    hint: self.expr(0)?,
+                                    hint,
+                                    input_type,
                                 }
                             }
                             "scroll_view" => StatementKind::ScrollView { id: name },
+                            "frame_layout" => StatementKind::FrameLayout { id: name },
+                            "check_box" | "switch" => {
+                                self.word("text")?;
+                                self.sym(":")?;
+                                let text = self.expr(0)?;
+                                if ctor == "check_box" {
+                                    StatementKind::CheckBox { id: name, text }
+                                } else {
+                                    StatementKind::Switch { id: name, text }
+                                }
+                            }
+                            "progress_bar" => StatementKind::ProgressBar { id: name },
+                            "image_view" => {
+                                self.word("icon")?;
+                                self.sym(":")?;
+                                let (value, span) = self.id()?;
+                                let icon = match value.as_str() {
+                                    "info" => BuiltinIcon::Info,
+                                    "warning" => BuiltinIcon::Warning,
+                                    "delete" => BuiltinIcon::Delete,
+                                    _ => {
+                                        return Err(Diagnostic::at(
+                                            "AIC1413",
+                                            span,
+                                            "icon must be info, warning, or delete",
+                                        ))
+                                    }
+                                };
+                                StatementKind::ImageView { id: name, icon }
+                            }
+                            "toolbar" => {
+                                self.word("title")?;
+                                self.sym(":")?;
+                                StatementKind::Toolbar {
+                                    id: name,
+                                    title: self.expr(0)?,
+                                }
+                            }
+                            "list_view" | "spinner" => {
+                                self.word("items")?;
+                                self.sym(":")?;
+                                let items = if self.cur().k == K::Sym("[") {
+                                    self.pop();
+                                    let mut values = Vec::new();
+                                    while self.cur().k != K::Sym("]") {
+                                        values.push(self.expr(0)?);
+                                        if self.cur().k != K::Sym(",") {
+                                            break;
+                                        }
+                                        self.pop();
+                                    }
+                                    self.sym("]")?;
+                                    CollectionItems::Inline(values)
+                                } else {
+                                    CollectionItems::State(self.id()?.0)
+                                };
+                                if ctor == "list_view" {
+                                    StatementKind::ListView { id: name, items }
+                                } else {
+                                    StatementKind::Spinner { id: name, items }
+                                }
+                            }
                             _ => {
                                 return Err(Diagnostic::at(
                                     "AIC1010",
@@ -1175,6 +1458,30 @@ impl Parser {
                     text: self.expr(0)?,
                 }
             }
+            "set_text_size" => {
+                self.word("view")?;
+                self.sym(":")?;
+                let (view, _) = self.id()?;
+                self.sym(",")?;
+                self.word("size_sp")?;
+                self.sym(":")?;
+                let token = self.pop();
+                let K::Int(size_sp) = token.k else {
+                    return Err(Diagnostic::at(
+                        "AIC1427",
+                        token.s,
+                        "text size must be an integer SP literal",
+                    ));
+                };
+                if !(1..=200).contains(&size_sp) {
+                    return Err(Diagnostic::at(
+                        "AIC1427",
+                        token.s,
+                        "text size must be between 1 and 200 SP",
+                    ));
+                }
+                StatementKind::SetTextSize { view, size_sp }
+            }
             "set_layout" => {
                 self.word("view")?;
                 self.sym(":")?;
@@ -1205,11 +1512,40 @@ impl Parser {
                         "layout weight must be 0 or 1",
                     ));
                 }
+                let mut margins = [0; 4];
+                if self.cur().k == K::Sym(",") {
+                    for (index, name) in
+                        ["margin_left", "margin_top", "margin_right", "margin_bottom"]
+                            .iter()
+                            .enumerate()
+                    {
+                        self.sym(",")?;
+                        self.word(name)?;
+                        self.sym(":")?;
+                        let token = self.pop();
+                        let K::Int(value) = token.k else {
+                            return Err(Diagnostic::at(
+                                "AIC1416",
+                                token.s,
+                                "layout margins must be integer dp values",
+                            ));
+                        };
+                        if !(0..=4096).contains(&value) {
+                            return Err(Diagnostic::at(
+                                "AIC1416",
+                                token.s,
+                                "layout margins must be between 0 and 4096 dp",
+                            ));
+                        }
+                        margins[index] = value;
+                    }
+                }
                 StatementKind::SetLayout {
                     view,
                     width,
                     height,
                     weight,
+                    margins,
                 }
             }
             "set_text_color" | "set_background_color" => {
@@ -1233,6 +1569,165 @@ impl Parser {
                     StatementKind::SetBackgroundColor { view, color }
                 }
             }
+            "start_activity" => {
+                let (activity, _) = self.id()?;
+                let extras = if self.cur().k == K::Sym(",") {
+                    self.pop();
+                    self.word("extras")?;
+                    self.sym(":")?;
+                    self.named_values()?
+                } else {
+                    Vec::new()
+                };
+                StatementKind::StartActivity { activity, extras }
+            }
+            "finish" => StatementKind::FinishActivity,
+            "set_padding" => {
+                self.word("view")?;
+                self.sym(":")?;
+                let (view, _) = self.id()?;
+                let mut values = Vec::new();
+                for name in ["left", "top", "right", "bottom"] {
+                    self.sym(",")?;
+                    self.word(name)?;
+                    self.sym(":")?;
+                    let token = self.pop();
+                    let K::Int(value) = token.k else {
+                        return Err(Diagnostic::at(
+                            "AIC1410",
+                            token.s,
+                            "padding must be an integer dp value",
+                        ));
+                    };
+                    if !(0..=4096).contains(&value) {
+                        return Err(Diagnostic::at(
+                            "AIC1410",
+                            token.s,
+                            "padding must be between 0 and 4096 dp",
+                        ));
+                    }
+                    values.push(value);
+                }
+                StatementKind::SetPadding {
+                    view,
+                    left: values[0],
+                    top: values[1],
+                    right: values[2],
+                    bottom: values[3],
+                }
+            }
+            "set_visibility" => {
+                self.word("view")?;
+                self.sym(":")?;
+                let (view, _) = self.id()?;
+                self.sym(",")?;
+                self.word("visibility")?;
+                self.sym(":")?;
+                let (value, span) = self.id()?;
+                let visibility = match value.as_str() {
+                    "visible" => Visibility::Visible,
+                    "invisible" => Visibility::Invisible,
+                    "gone" => Visibility::Gone,
+                    _ => {
+                        return Err(Diagnostic::at(
+                            "AIC1411",
+                            span,
+                            "visibility must be visible, invisible, or gone",
+                        ))
+                    }
+                };
+                StatementKind::SetVisibility { view, visibility }
+            }
+            "set_enabled" => {
+                self.word("view")?;
+                self.sym(":")?;
+                let (view, _) = self.id()?;
+                self.sym(",")?;
+                self.word("enabled")?;
+                self.sym(":")?;
+                StatementKind::SetEnabled {
+                    view,
+                    enabled: self.expr(0)?,
+                }
+            }
+            "set_content_description" => {
+                self.word("view")?;
+                self.sym(":")?;
+                let (view, _) = self.id()?;
+                self.sym(",")?;
+                self.word("text")?;
+                self.sym(":")?;
+                StatementKind::SetContentDescription {
+                    view,
+                    text: self.expr(0)?,
+                }
+            }
+            "set_decorative" => {
+                self.word("view")?;
+                self.sym(":")?;
+                let (view, _) = self.id()?;
+                StatementKind::SetDecorative { view }
+            }
+            "set_input_label" => {
+                self.word("label")?;
+                self.sym(":")?;
+                let (label, _) = self.id()?;
+                self.sym(",")?;
+                self.word("input")?;
+                self.sym(":")?;
+                let (input, _) = self.id()?;
+                StatementKind::SetInputLabel { label, input }
+            }
+            "set_heading" => {
+                self.word("view")?;
+                self.sym(":")?;
+                let (view, _) = self.id()?;
+                StatementKind::SetHeading { view }
+            }
+            "set_gravity" => {
+                self.word("view")?;
+                self.sym(":")?;
+                let (view, _) = self.id()?;
+                self.sym(",")?;
+                self.word("gravity")?;
+                self.sym(":")?;
+                let (value, span) = self.id()?;
+                let gravity = match value.as_str() {
+                    "start" => Gravity::Start,
+                    "center" => Gravity::Center,
+                    "end" => Gravity::End,
+                    _ => {
+                        return Err(Diagnostic::at(
+                            "AIC1412",
+                            span,
+                            "gravity must be start, center, or end",
+                        ))
+                    }
+                };
+                StatementKind::SetGravity { view, gravity }
+            }
+            "show_dialog" => {
+                self.word("title")?;
+                self.sym(":")?;
+                let title = self.expr(0)?;
+                self.sym(",")?;
+                self.word("message")?;
+                self.sym(":")?;
+                let message = self.expr(0)?;
+                StatementKind::ShowDialog { title, message }
+            }
+            "show_menu" => {
+                self.word("anchor")?;
+                self.sym(":")?;
+                let (anchor, _) = self.id()?;
+                self.sym(",")?;
+                self.word("item")?;
+                self.sym(":")?;
+                StatementKind::ShowMenu {
+                    anchor,
+                    item: self.expr(0)?,
+                }
+            }
             _ => {
                 return Err(Diagnostic::at(
                     "AIC1010",
@@ -1245,14 +1740,15 @@ impl Parser {
         Ok(k)
     }
     fn layout_size(&mut self) -> Result<LayoutSize, Diagnostic> {
-        let (value, span) = self.id()?;
-        match value.as_str() {
-            "match_parent" => Ok(LayoutSize::MatchParent),
-            "wrap_content" => Ok(LayoutSize::WrapContent),
+        let token = self.pop();
+        match token.k {
+            K::Word(value) if value == "match_parent" => Ok(LayoutSize::MatchParent),
+            K::Word(value) if value == "wrap_content" => Ok(LayoutSize::WrapContent),
+            K::Int(value) if (0..=4096).contains(&value) => Ok(LayoutSize::Dp(value)),
             _ => Err(Diagnostic::at(
                 "AIC1015",
-                span,
-                "layout size must be match_parent or wrap_content",
+                token.s,
+                "layout size must be match_parent, wrap_content, or 0..4096 dp",
             )),
         }
     }
@@ -1493,11 +1989,52 @@ pub fn parse_program(source: &str) -> Result<Program, Diagnostic> {
     verify(parse(source)?)
 }
 
+/// Deterministically upgrades a complete AIC 0.1 source document to 0.2.
+/// Existing syntax is intentionally preserved byte-for-byte after the version
+/// header so migration remains reviewable and behavior preserving.
+pub fn migrate_source(source: &str) -> Result<String, Diagnostic> {
+    let program = parse_program(source)?;
+    match program.version.as_str() {
+        "0.2" => Ok(source.to_owned()),
+        "0.1" => {
+            let prefix = "aic_version 0.1";
+            if !source.starts_with(prefix) {
+                return Err(Diagnostic::global(
+                    "AIC1401",
+                    "AIC 0.1 source must begin with its canonical version header",
+                ));
+            }
+            Ok(format!("aic_version 0.2{}", &source[prefix.len()..]))
+        }
+        _ => Err(Diagnostic::global(
+            "AIC1402",
+            "unsupported migration source",
+        )),
+    }
+}
+
+/// The machine-readable catalog embedded into compiler and host builds.
+#[must_use]
+pub fn capability_catalog() -> &'static str {
+    include_str!("../../../schema/capabilities-0.2.json")
+}
+
 #[derive(Clone)]
 struct Binding {
     ty: Type,
     mutable: bool,
     is_view: bool,
+    view_kind: Option<ViewKind>,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ViewKind {
+    TextView,
+    Text,
+    Input,
+    Interactive,
+    Image,
+    Progress,
+    Other,
 }
 struct Check {
     sig: BTreeMap<String, (Vec<Type>, Type)>,
@@ -1507,8 +2044,147 @@ struct Check {
     preferences: BTreeMap<String, Type>,
     tables: BTreeMap<String, BTreeMap<String, Column>>,
     used_capabilities: BTreeSet<Capability>,
+    string_collections: BTreeSet<String>,
+    strict_ui_semantics: bool,
 }
-pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
+pub fn verify(mut s: SyntaxProgram) -> Result<Program, Diagnostic> {
+    let mut names = BTreeSet::new();
+    for activity in &s.activities {
+        if !names.insert(activity.name.clone()) {
+            return Err(Diagnostic::global(
+                "AIC1403",
+                format!("duplicate activity `{}`", activity.name),
+            ));
+        }
+    }
+    for activity in &mut s.activities {
+        validate_navigation(&mut activity.on_create, &names, &s.package)?;
+        for handler in &mut activity.on_click {
+            validate_navigation(&mut handler.body, &names, &s.package)?;
+        }
+        for handler in &mut activity.on_select {
+            validate_navigation(&mut handler.body, &names, &s.package)?;
+        }
+    }
+    s.activity = s.activities[0].clone();
+    if s.version == "0.1" && s.activities.len() != 1 {
+        return Err(Diagnostic::global(
+            "AIC1404",
+            "multiple activities require AIC IR 0.2",
+        ));
+    }
+    if s.activities.len() == 1 {
+        return verify_one(s, true);
+    }
+    let mut verified = Vec::new();
+    for activity in &s.activities {
+        let mut item = s.clone();
+        item.activity = activity.clone();
+        item.activities = vec![activity.clone()];
+        verified.push(verify_one(item, false)?.activity);
+    }
+    let mut result_source = s;
+    result_source.activity = result_source.activities[0].clone();
+    result_source.activities = vec![result_source.activity.clone()];
+    let mut result = verify_one(result_source, false)?;
+    result.activity = verified[0].clone();
+    result.activities = verified;
+    Ok(result)
+}
+
+fn validate_navigation(
+    body: &mut [Statement],
+    activities: &BTreeSet<String>,
+    package: &str,
+) -> Result<(), Diagnostic> {
+    for statement in body {
+        match &mut statement.kind {
+            StatementKind::StartActivity { activity, extras } => {
+                if !activities.contains(activity) {
+                    return Err(Diagnostic::at(
+                        "AIC1406",
+                        statement.span,
+                        format!("unknown navigation target `{activity}`"),
+                    ));
+                }
+                let mut keys = BTreeSet::new();
+                for (key, _) in extras {
+                    if !keys.insert(key.clone()) {
+                        return Err(Diagnostic::at(
+                            "AIC1415",
+                            statement.span,
+                            format!("duplicate navigation extra `{key}`"),
+                        ));
+                    }
+                }
+                *activity = format!("{package}.{activity}");
+            }
+            StatementKind::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                validate_navigation(then_body, activities, package)?;
+                validate_navigation(else_body, activities, package)?;
+            }
+            StatementKind::For { body, .. } => validate_navigation(body, activities, package)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn validate_constant_view_states(body: &[Statement]) -> Result<(), Diagnostic> {
+    let mut visibility = BTreeMap::new();
+    let mut enabled = BTreeMap::new();
+    for statement in body {
+        match &statement.kind {
+            StatementKind::SetVisibility {
+                view,
+                visibility: value,
+            } => {
+                if let Some(previous) = visibility.insert(view, *value) {
+                    if previous != *value {
+                        return Err(Diagnostic::at(
+                            "AIC1440",
+                            statement.span,
+                            format!("conflicting constant visibility assignments for `{view}`"),
+                        ));
+                    }
+                }
+            }
+            StatementKind::SetEnabled {
+                view,
+                enabled: value,
+            } => {
+                if let ExpressionKind::Literal(Value::Bool(value)) = value.kind {
+                    if let Some(previous) = enabled.insert(view, value) {
+                        if previous != value {
+                            return Err(Diagnostic::at(
+                                "AIC1441",
+                                statement.span,
+                                format!("conflicting constant enabled assignments for `{view}`"),
+                            ));
+                        }
+                    }
+                }
+            }
+            StatementKind::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                validate_constant_view_states(then_body)?;
+                validate_constant_view_states(else_body)?;
+            }
+            StatementKind::For { body, .. } => validate_constant_view_states(body)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn verify_one(s: SyntaxProgram, enforce_unused_capabilities: bool) -> Result<Program, Diagnostic> {
     if s.package.split('.').count() < 2
         || s.package.split('.').any(|x| {
             x.is_empty()
@@ -1540,26 +2216,160 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
         ));
     }
     let mut containers = BTreeMap::new();
+    let mut views = BTreeSet::new();
+    let mut interactive_views = BTreeSet::new();
+    let mut semantic_views = BTreeMap::new();
     for statement in &s.activity.on_create {
         match &statement.kind {
-            StatementKind::LinearLayout { id, .. } => {
+            StatementKind::LinearLayout { id, .. } | StatementKind::FrameLayout { id } => {
                 containers.insert(id.clone(), None);
+                views.insert(id.clone());
             }
             StatementKind::ScrollView { id } => {
                 containers.insert(id.clone(), Some(0_usize));
+                views.insert(id.clone());
+            }
+            StatementKind::Button { id, .. }
+            | StatementKind::EditText { id, .. }
+            | StatementKind::TextInput { id, .. }
+            | StatementKind::CheckBox { id, .. }
+            | StatementKind::Switch { id, .. }
+            | StatementKind::Toolbar { id, .. }
+            | StatementKind::ListView { id, .. }
+            | StatementKind::Spinner { id, .. } => {
+                views.insert(id.clone());
+                interactive_views.insert(id.clone());
+            }
+            StatementKind::TextView { id, .. } => {
+                views.insert(id.clone());
+            }
+            StatementKind::ProgressBar { id } => {
+                views.insert(id.clone());
+                semantic_views.insert(id.clone(), (statement.span, false));
+            }
+            StatementKind::ImageView { id, .. } => {
+                views.insert(id.clone());
+                semantic_views.insert(id.clone(), (statement.span, true));
             }
             _ => {}
         }
     }
+    let mut described = BTreeSet::new();
+    let mut decorative = BTreeSet::new();
+    if s.version == "0.2" {
+        for statement in &s.activity.on_create {
+            match &statement.kind {
+                StatementKind::SetContentDescription { view, text } => {
+                    if matches!(&text.kind, ExpressionKind::Literal(Value::String(value)) if value.trim().is_empty())
+                    {
+                        return Err(Diagnostic::at(
+                            "AIC1436",
+                            text.span,
+                            "content description must not be empty",
+                        ));
+                    }
+                    if semantic_views.contains_key(view)
+                        && (!described.insert(view.clone()) || decorative.contains(view))
+                    {
+                        return Err(Diagnostic::at(
+                        "AIC1437",
+                        statement.span,
+                        "an image or progress control must have exactly one accessibility treatment",
+                    ));
+                    }
+                }
+                StatementKind::SetDecorative { view }
+                    if !decorative.insert(view.clone()) || described.contains(view) =>
+                {
+                    return Err(Diagnostic::at(
+                    "AIC1437",
+                    statement.span,
+                    "an image may be marked decorative exactly once and cannot also have a content description",
+                ));
+                }
+                _ => {}
+            }
+        }
+        for (view, (span, is_image)) in semantic_views {
+            if !described.contains(&view) && !decorative.contains(&view) {
+                return Err(Diagnostic::at(
+                    "AIC1435",
+                    span,
+                    if is_image {
+                        format!("`{view}` requires a content description or explicit decorative semantics")
+                    } else {
+                        format!("progress control `{view}` requires a content description")
+                    },
+                ));
+            }
+        }
+        validate_constant_view_states(&s.activity.on_create)?;
+        for handler in &s.activity.on_click {
+            validate_constant_view_states(&handler.body)?;
+        }
+        for handler in &s.activity.on_select {
+            validate_constant_view_states(&handler.body)?;
+        }
+    }
     for statement in &s.activity.on_create {
-        if let StatementKind::AddView { parent, .. } = &statement.kind {
+        if let StatementKind::SetLayout {
+            view,
+            width,
+            height,
+            ..
+        } = &statement.kind
+        {
+            if interactive_views.contains(view) {
+                if matches!(width, LayoutSize::Dp(value) if *value < 48) {
+                    return Err(Diagnostic::at(
+                        "AIC1433",
+                        statement.span,
+                        "interactive view width must be at least 48dp",
+                    ));
+                }
+                if matches!(height, LayoutSize::Dp(value) if *value < 48) {
+                    return Err(Diagnostic::at(
+                        "AIC1434",
+                        statement.span,
+                        "interactive view height must be at least 48dp",
+                    ));
+                }
+            }
+        }
+    }
+    let mut labels = BTreeSet::new();
+    let mut labeled_inputs = BTreeSet::new();
+    for statement in &s.activity.on_create {
+        if let StatementKind::SetInputLabel { label, input } = &statement.kind {
+            if !labels.insert(label) || !labeled_inputs.insert(input) {
+                return Err(Diagnostic::at(
+                    "AIC1432",
+                    statement.span,
+                    "each input label and labeled input may appear in only one relationship",
+                ));
+            }
+        }
+    }
+    let mut parents = BTreeMap::new();
+    for statement in &s.activity.on_create {
+        if let StatementKind::AddView { parent, child } = &statement.kind {
             let entry = containers.get_mut(parent).ok_or_else(|| {
                 Diagnostic::at(
                     "AIC1130",
                     statement.span,
-                    "android.add_view parent must be a LinearLayout or ScrollView",
+                    "android.add_view parent must be a LinearLayout, FrameLayout, or ScrollView",
                 )
             })?;
+            if parent == child {
+                return Err(Diagnostic::at(
+                    "AIC1133",
+                    statement.span,
+                    "a view cannot contain itself",
+                ));
+            }
+            if !views.contains(child) {
+                return Err(Diagnostic::at("AIC1105", statement.span, "unknown view"));
+            }
             if let Some(count) = entry {
                 *count += 1;
                 if *count > 1 {
@@ -1570,6 +2380,26 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
                     ));
                 }
             }
+            if parents.insert(child.clone(), parent.clone()).is_some() {
+                return Err(Diagnostic::at(
+                    "AIC1134",
+                    statement.span,
+                    "a view may have only one parent",
+                ));
+            }
+        }
+    }
+    for child in parents.keys() {
+        let mut cursor = child;
+        let mut seen = BTreeSet::new();
+        while let Some(parent) = parents.get(cursor) {
+            if !seen.insert(cursor) {
+                return Err(Diagnostic::global(
+                    "AIC1135",
+                    "view containment must not contain a cycle",
+                ));
+            }
+            cursor = parent;
         }
     }
     if containers.values().any(|value| matches!(value, Some(0))) {
@@ -1577,6 +2407,22 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
             "AIC1132",
             "ScrollView must contain exactly one child",
         ));
+    }
+    if let Some(root) = s
+        .activity
+        .on_create
+        .iter()
+        .find_map(|statement| match &statement.kind {
+            StatementKind::SetContentView { view } => Some(view),
+            _ => None,
+        })
+    {
+        if parents.contains_key(root) {
+            return Err(Diagnostic::global(
+                "AIC1136",
+                "the content view must be a root and cannot have a parent",
+            ));
+        }
     }
     let mut declared_capabilities = BTreeSet::new();
     for (capability, span) in &s.capabilities {
@@ -1685,6 +2531,8 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
             preferences: preferences.clone(),
             tables: tables.clone(),
             used_capabilities: BTreeSet::new(),
+            string_collections: BTreeSet::new(),
+            strict_ui_semantics: s.version == "0.2",
         };
         let mut env = BTreeMap::new();
         for p in &f.params {
@@ -1695,6 +2543,7 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
                         ty: p.ty,
                         mutable: false,
                         is_view: false,
+                        view_kind: None,
                     },
                 )
                 .is_some()
@@ -1721,6 +2570,13 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
         preferences: preferences.clone(),
         tables: tables.clone(),
         used_capabilities: BTreeSet::new(),
+        string_collections: s
+            .activity
+            .string_collections
+            .iter()
+            .map(|x| x.name.clone())
+            .collect(),
+        strict_ui_semantics: s.version == "0.2",
     };
     let mut activity_env = BTreeMap::new();
     for state in &s.activity.state {
@@ -1733,6 +2589,7 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
                     ty: state.ty,
                     mutable: true,
                     is_view: false,
+                    view_kind: None,
                 },
             )
             .is_some()
@@ -1742,6 +2599,33 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
                 state.span,
                 "duplicate activity state",
             ));
+        }
+    }
+    let mut all_state_names: BTreeSet<String> =
+        s.activity.state.iter().map(|x| x.name.clone()).collect();
+    for collection in &s.activity.string_collections {
+        if !all_state_names.insert(collection.name.clone()) {
+            return Err(Diagnostic::at(
+                "AIC1420",
+                collection.span,
+                "duplicate activity state",
+            ));
+        }
+        if collection.items.is_empty() || collection.items.len() > 100 {
+            return Err(Diagnostic::at(
+                "AIC1419",
+                collection.span,
+                "string collection requires 1 to 100 items",
+            ));
+        }
+        for item in &collection.items {
+            if !matches!(item.kind, ExpressionKind::Literal(Value::String(_))) {
+                return Err(Diagnostic::at(
+                    "AIC1421",
+                    item.span,
+                    "string collection items must be string literals",
+                ));
+            }
         }
     }
     c.stmts(&s.activity.on_create, &mut activity_env)?;
@@ -1772,6 +2656,64 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
         }
         c.stmts(&handler.body, &mut activity_env.clone())?;
     }
+    let selectable: BTreeSet<_> = s
+        .activity
+        .on_create
+        .iter()
+        .filter_map(|statement| match &statement.kind {
+            StatementKind::ListView { id, .. } | StatementKind::Spinner { id, .. } => {
+                Some(id.clone())
+            }
+            _ => None,
+        })
+        .collect();
+    let mut selected = BTreeSet::new();
+    for handler in &s.activity.on_select {
+        if !selectable.contains(&handler.view) {
+            return Err(Diagnostic::at(
+                "AIC1422",
+                handler.span,
+                "on_select target must be a declared list_view or spinner",
+            ));
+        }
+        if !selected.insert(handler.view.clone()) {
+            return Err(Diagnostic::at(
+                "AIC1423",
+                handler.span,
+                "duplicate on_select handler",
+            ));
+        }
+        if handler.index == handler.value
+            || activity_env.contains_key(&handler.index)
+            || activity_env.contains_key(&handler.value)
+        {
+            return Err(Diagnostic::at(
+                "AIC1424",
+                handler.span,
+                "on_select parameters must be distinct new names",
+            ));
+        }
+        let mut handler_env = activity_env.clone();
+        handler_env.insert(
+            handler.index.clone(),
+            Binding {
+                ty: Type::I32,
+                mutable: false,
+                is_view: false,
+                view_kind: None,
+            },
+        );
+        handler_env.insert(
+            handler.value.clone(),
+            Binding {
+                ty: Type::String,
+                mutable: false,
+                is_view: false,
+                view_kind: None,
+            },
+        );
+        c.stmts(&handler.body, &mut handler_env)?;
+    }
     let used = c.used_capabilities.clone();
     for capability in &used {
         if !declared_capabilities.contains(capability) {
@@ -1785,7 +2727,7 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
         }
     }
     for capability in &declared_capabilities {
-        if !used.contains(capability) {
+        if enforce_unused_capabilities && !used.contains(capability) {
             return Err(Diagnostic::global(
                 "AIC1316",
                 format!("declared capability `{}` is unused", capability.name()),
@@ -1793,6 +2735,14 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
         }
     }
     cycles(&graph)?;
+    let activity = Activity {
+        name: s.activity.name,
+        state: s.activity.state,
+        string_collections: s.activity.string_collections,
+        on_create: s.activity.on_create,
+        on_click: s.activity.on_click,
+        on_select: s.activity.on_select,
+    };
     Ok(Program {
         version: s.version,
         label: s.label,
@@ -1811,12 +2761,8 @@ pub fn verify(s: SyntaxProgram) -> Result<Program, Diagnostic> {
                 span: f.span,
             })
             .collect(),
-        activity: Activity {
-            name: s.activity.name,
-            state: s.activity.state,
-            on_create: s.activity.on_create,
-            on_click: s.activity.on_click,
-        },
+        activity: activity.clone(),
+        activities: vec![activity],
     })
 }
 impl Check {
@@ -1846,6 +2792,13 @@ impl Check {
                 ty,
                 value,
             } => {
+                if self.string_collections.contains(name) {
+                    return Err(Diagnostic::at(
+                        "AIC1420",
+                        s.span,
+                        "local name conflicts with string collection state",
+                    ));
+                }
                 let a = self.expr(value, e)?;
                 if let Some(t) = ty {
                     req(*t, a, value.span)?
@@ -1856,6 +2809,7 @@ impl Check {
                         ty: ty.unwrap_or(a),
                         mutable: *mutable,
                         is_view: false,
+                        view_kind: None,
                     },
                 )
                 .is_some()
@@ -1869,6 +2823,13 @@ impl Check {
                 Ok(false)
             }
             StatementKind::Assign { name, value } => {
+                if self.string_collections.contains(name) {
+                    return Err(Diagnostic::at(
+                        "AIC1426",
+                        s.span,
+                        "string collection state cannot be reassigned",
+                    ));
+                }
                 let b = e.get(name).cloned().ok_or_else(|| {
                     Diagnostic::at("AIC1107", s.span, format!("undefined symbol `{name}`"))
                 })?;
@@ -1919,6 +2880,7 @@ impl Check {
                         ty: Type::I32,
                         mutable: false,
                         is_view: false,
+                        view_kind: None,
                     },
                 )
                 .is_some()
@@ -1937,13 +2899,43 @@ impl Check {
             | StatementKind::Button { id, .. }
             | StatementKind::EditText { id, .. }
             | StatementKind::TextInput { id, .. }
-            | StatementKind::ScrollView { id } => {
+            | StatementKind::ScrollView { id }
+            | StatementKind::FrameLayout { id }
+            | StatementKind::CheckBox { id, .. }
+            | StatementKind::Switch { id, .. }
+            | StatementKind::ProgressBar { id }
+            | StatementKind::ImageView { id, .. }
+            | StatementKind::Toolbar { id, .. }
+            | StatementKind::ListView { id, .. }
+            | StatementKind::Spinner { id, .. } => {
+                if self.string_collections.contains(id) {
+                    return Err(Diagnostic::at(
+                        "AIC1420",
+                        s.span,
+                        "view id conflicts with string collection state",
+                    ));
+                }
                 if e.insert(
                     id.clone(),
                     Binding {
                         ty: Type::String,
                         mutable: false,
                         is_view: true,
+                        view_kind: Some(match &s.kind {
+                            StatementKind::EditText { .. } | StatementKind::TextInput { .. } => {
+                                ViewKind::Input
+                            }
+                            StatementKind::TextView { .. } => ViewKind::TextView,
+                            StatementKind::Button { .. }
+                            | StatementKind::CheckBox { .. }
+                            | StatementKind::Switch { .. } => ViewKind::Text,
+                            StatementKind::Toolbar { .. }
+                            | StatementKind::ListView { .. }
+                            | StatementKind::Spinner { .. } => ViewKind::Interactive,
+                            StatementKind::ImageView { .. } => ViewKind::Image,
+                            StatementKind::ProgressBar { .. } => ViewKind::Progress,
+                            _ => ViewKind::Other,
+                        }),
                     },
                 )
                 .is_some()
@@ -1958,6 +2950,66 @@ impl Check {
                     let a = self.expr(text, e)?;
                     req(Type::String, a, text.span)?
                 }
+                if let StatementKind::CheckBox { text, .. } | StatementKind::Switch { text, .. } =
+                    &s.kind
+                {
+                    let a = self.expr(text, e)?;
+                    req(Type::String, a, text.span)?;
+                }
+                if let StatementKind::Toolbar { title, .. } = &s.kind {
+                    let a = self.expr(title, e)?;
+                    req(Type::String, a, title.span)?;
+                }
+                if let StatementKind::ListView { items, .. } = &s.kind {
+                    match items {
+                        CollectionItems::Inline(items) => {
+                            if items.is_empty() || items.len() > 100 {
+                                return Err(Diagnostic::at(
+                                    "AIC1414",
+                                    s.span,
+                                    "list_view requires 1 to 100 rows",
+                                ));
+                            }
+                            for item in items {
+                                let a = self.expr(item, e)?;
+                                req(Type::String, a, item.span)?;
+                            }
+                        }
+                        CollectionItems::State(name) if !self.string_collections.contains(name) => {
+                            return Err(Diagnostic::at(
+                                "AIC1425",
+                                s.span,
+                                "items must name a string[] activity state",
+                            ));
+                        }
+                        CollectionItems::State(_) => {}
+                    }
+                }
+                if let StatementKind::Spinner { items, .. } = &s.kind {
+                    match items {
+                        CollectionItems::Inline(items) => {
+                            if items.is_empty() || items.len() > 100 {
+                                return Err(Diagnostic::at(
+                                    "AIC1418",
+                                    s.span,
+                                    "spinner requires 1 to 100 items",
+                                ));
+                            }
+                            for item in items {
+                                let actual = self.expr(item, e)?;
+                                req(Type::String, actual, item.span)?;
+                            }
+                        }
+                        CollectionItems::State(name) if !self.string_collections.contains(name) => {
+                            return Err(Diagnostic::at(
+                                "AIC1425",
+                                s.span,
+                                "items must name a string[] activity state",
+                            ));
+                        }
+                        CollectionItems::State(_) => {}
+                    }
+                }
                 Ok(false)
             }
             StatementKind::AddView { parent, child } => {
@@ -1967,15 +3019,157 @@ impl Check {
             }
             StatementKind::SetContentView { view: v }
             | StatementKind::SetLayout { view: v, .. }
-            | StatementKind::SetTextColor { view: v, .. }
-            | StatementKind::SetBackgroundColor { view: v, .. } => {
+            | StatementKind::SetBackgroundColor { view: v, .. }
+            | StatementKind::SetPadding { view: v, .. }
+            | StatementKind::SetVisibility { view: v, .. }
+            | StatementKind::SetGravity { view: v, .. } => {
                 view(e, v, s.span)?;
                 Ok(false)
             }
-            StatementKind::SetText { view: v, text } => {
+            StatementKind::SetTextColor { view: v, .. } => {
+                let binding = e.get(v).ok_or_else(|| {
+                    Diagnostic::at("AIC1105", s.span, format!("unknown view id `{v}`"))
+                })?;
+                if self.strict_ui_semantics
+                    && !matches!(
+                        binding.view_kind,
+                        Some(ViewKind::TextView | ViewKind::Text | ViewKind::Input)
+                    )
+                {
+                    return Err(Diagnostic::at(
+                        "AIC1442",
+                        s.span,
+                        "text color target must be a text_view, button, edit_text, text_input, check_box, or switch",
+                    ));
+                }
+                Ok(false)
+            }
+            StatementKind::SetText { view: v, text }
+            | StatementKind::SetContentDescription { view: v, text } => {
                 view(e, v, s.span)?;
                 let actual = self.expr(text, e)?;
                 req(Type::String, actual, text.span)?;
+                Ok(false)
+            }
+            StatementKind::SetTextSize { view: v, .. } => {
+                let binding = e.get(v).ok_or_else(|| {
+                    Diagnostic::at("AIC1105", s.span, format!("unknown view id `{v}`"))
+                })?;
+                if !matches!(
+                    binding.view_kind,
+                    Some(ViewKind::TextView | ViewKind::Text | ViewKind::Input)
+                ) {
+                    return Err(Diagnostic::at(
+                        "AIC1428",
+                        s.span,
+                        "text size target must be a text_view, button, edit_text, text_input, check_box, or switch",
+                    ));
+                }
+                Ok(false)
+            }
+            StatementKind::SetInputLabel { label, input } => {
+                let label_binding = e.get(label).ok_or_else(|| {
+                    Diagnostic::at("AIC1105", s.span, format!("unknown view id `{label}`"))
+                })?;
+                if label_binding.view_kind != Some(ViewKind::TextView) {
+                    return Err(Diagnostic::at(
+                        "AIC1429",
+                        s.span,
+                        "input label must be a text_view",
+                    ));
+                }
+                let input_binding = e.get(input).ok_or_else(|| {
+                    Diagnostic::at("AIC1105", s.span, format!("unknown view id `{input}`"))
+                })?;
+                if input_binding.view_kind != Some(ViewKind::Input) {
+                    return Err(Diagnostic::at(
+                        "AIC1430",
+                        s.span,
+                        "labeled input must be an edit_text or text_input",
+                    ));
+                }
+                Ok(false)
+            }
+            StatementKind::SetHeading { view: target } => {
+                let binding = e.get(target).ok_or_else(|| {
+                    Diagnostic::at("AIC1105", s.span, format!("unknown view id `{target}`"))
+                })?;
+                if binding.view_kind != Some(ViewKind::TextView) {
+                    return Err(Diagnostic::at(
+                        "AIC1431",
+                        s.span,
+                        "heading must be a text_view",
+                    ));
+                }
+                Ok(false)
+            }
+            StatementKind::SetDecorative { view: target } => {
+                let binding = e.get(target).ok_or_else(|| {
+                    Diagnostic::at("AIC1105", s.span, format!("unknown view id `{target}`"))
+                })?;
+                if binding.view_kind != Some(ViewKind::Image) {
+                    return Err(Diagnostic::at(
+                        "AIC1438",
+                        s.span,
+                        "decorative semantics require an image_view",
+                    ));
+                }
+                Ok(false)
+            }
+            StatementKind::SetEnabled { view: v, enabled } => {
+                let binding = e.get(v).ok_or_else(|| {
+                    Diagnostic::at("AIC1105", s.span, format!("unknown view id `{v}`"))
+                })?;
+                if self.strict_ui_semantics
+                    && !matches!(
+                        binding.view_kind,
+                        Some(ViewKind::Text | ViewKind::Input | ViewKind::Interactive)
+                    )
+                {
+                    return Err(Diagnostic::at(
+                        "AIC1439",
+                        s.span,
+                        "enabled state requires an interactive control",
+                    ));
+                }
+                let actual = self.expr(enabled, e)?;
+                req(Type::Bool, actual, enabled.span)?;
+                Ok(false)
+            }
+            StatementKind::StartActivity { extras, .. } => {
+                if self.ret.is_some() {
+                    return Err(Diagnostic::at(
+                        "AIC1407",
+                        s.span,
+                        "navigation is activity-only",
+                    ));
+                }
+                for (_, value) in extras {
+                    self.expr(value, e)?;
+                }
+                Ok(false)
+            }
+            StatementKind::FinishActivity => {
+                if self.ret.is_some() {
+                    return Err(Diagnostic::at(
+                        "AIC1407",
+                        s.span,
+                        "navigation is activity-only",
+                    ));
+                }
+                Ok(false)
+            }
+            StatementKind::ShowDialog { title, message } => {
+                for value in [title, message] {
+                    let actual = self.expr(value, e)?;
+                    req(Type::String, actual, value.span)?;
+                }
+                Ok(false)
+            }
+            StatementKind::ShowMenu { anchor, item } => {
+                view(e, anchor, s.span)?;
+                let actual = self.expr(item, e)?;
+                req(Type::String, actual, item.span)?;
                 Ok(false)
             }
             StatementKind::PreferenceSet { key, value } => {
@@ -2458,6 +3652,418 @@ mod tests {
     #[test]
     fn m1() {
         assert!(parse_program(M1).is_ok())
+    }
+    #[test]
+    fn m9_version_migration_and_catalog_are_deterministic() {
+        let old = include_str!("../../../testdata/hello.aic");
+        let migrated = migrate_source(old).unwrap();
+        assert!(migrated.starts_with("aic_version 0.2"));
+        assert_eq!(parse_program(&migrated).unwrap().version, "0.2");
+        assert_eq!(migrate_source(&migrated).unwrap(), migrated);
+        assert!(capability_catalog().contains("aic.capabilities/0.2"));
+        assert!(capability_catalog().contains("navigation.activities"));
+        assert!(capability_catalog().contains("ui.text.size"));
+        assert!(capability_catalog().contains("ui.color"));
+        assert!(capability_catalog().contains("accessibility.touch_targets"));
+        assert_eq!(
+            capability_catalog(),
+            include_str!("../../../../host/app/src/main/assets/ai/capabilities-0.2.json")
+        );
+        let navigation = include_str!("../../../testdata/m9-navigation.aic");
+        let program = parse_program(navigation).unwrap();
+        assert_eq!(program.activities.len(), 3);
+        assert!(program.activities[0].on_click[0].body.iter().any(|statement| matches!(statement.kind,
+            StatementKind::StartActivity { ref activity, .. } if activity == "dev.aic.navigation.DetailActivity")));
+        let start = program.activities[0].on_click[0]
+            .body
+            .iter()
+            .find_map(|statement| match &statement.kind {
+                StatementKind::StartActivity { extras, .. } => Some(extras),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(start.len(), 3);
+        let duplicate = navigation.replace(
+            "item_id: 7, editable: true, title: \"Details\"",
+            "item_id: 7, item_id: 8",
+        );
+        assert_eq!(parse_program(&duplicate).unwrap_err().code, "AIC1415");
+        let unknown = navigation.replace(
+            "start_activity(DetailActivity,",
+            "start_activity(MissingActivity,",
+        );
+        assert_eq!(parse_program(&unknown).unwrap_err().code, "AIC1406");
+        let old_multi = navigation.replace("aic_version 0.2", "aic_version 0.1");
+        assert_eq!(parse_program(&old_multi).unwrap_err().code, "AIC1404");
+    }
+    #[test]
+    fn m9_layout_dimensions_margins_and_containment_verify() {
+        let source = include_str!("../../../testdata/m9-navigation.aic");
+        let program = parse_program(source).unwrap();
+        assert!(program.activities[0]
+            .on_create
+            .iter()
+            .any(|statement| matches!(
+                statement.kind,
+                StatementKind::SetLayout {
+                    height: LayoutSize::Dp(96),
+                    margins: [8, 12, 8, 12],
+                    ..
+                }
+            )));
+        assert_eq!(
+            parse_program(&source.replace("height: 96", "height: 4097"))
+                .unwrap_err()
+                .code,
+            "AIC1015"
+        );
+        assert_eq!(
+            parse_program(&source.replace("margin_left: 8", "margin_left: -1"))
+                .unwrap_err()
+                .code,
+            "AIC1416"
+        );
+        let duplicate_parent = source.replace(
+            "android.add_view(parent: root, child: card)",
+            "android.add_view(parent: root, child: card) android.add_view(parent: root, child: icon)",
+        );
+        assert_eq!(
+            parse_program(&duplicate_parent).unwrap_err().code,
+            "AIC1134"
+        );
+        let cycle = source.replace(
+            "android.add_view(parent: root, child: card)",
+            "android.add_view(parent: root, child: card) android.add_view(parent: card, child: root)",
+        );
+        assert_eq!(parse_program(&cycle).unwrap_err().code, "AIC1135");
+        assert_eq!(
+            parse_program(include_str!(
+                "../../../testdata/invalid/m9-layout-margin.aic"
+            ))
+            .unwrap_err()
+            .code,
+            "AIC1416"
+        );
+        assert_eq!(
+            parse_program(include_str!(
+                "../../../testdata/invalid/m9-containment-cycle.aic"
+            ))
+            .unwrap_err()
+            .code,
+            "AIC1135"
+        );
+    }
+    #[test]
+    fn m9_common_inputs_and_spinner_verify() {
+        let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+        let input_activity = &program.activities[2];
+        let modes: Vec<_> = input_activity
+            .on_create
+            .iter()
+            .filter_map(|statement| match statement.kind {
+                StatementKind::TextInput { input_type, .. } => Some(input_type),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            modes,
+            vec![
+                InputType::Text,
+                InputType::Email,
+                InputType::Password,
+                InputType::Phone,
+                InputType::Integer,
+            ]
+        );
+        assert_eq!(
+            parse_program(include_str!("../../../testdata/invalid/m9-input-type.aic"))
+                .unwrap_err()
+                .code,
+            "AIC1417"
+        );
+        for source in [
+            include_str!("../../../testdata/invalid/m9-spinner-empty.aic"),
+            include_str!("../../../testdata/invalid/m9-spinner-oversized.aic"),
+        ] {
+            assert_eq!(parse_program(source).unwrap_err().code, "AIC1418");
+        }
+        assert_eq!(
+            parse_program(include_str!(
+                "../../../testdata/invalid/m9-spinner-type.aic"
+            ))
+            .unwrap_err()
+            .code,
+            "AIC1116"
+        );
+    }
+
+    #[test]
+    fn m9_state_backed_collections_and_selection_handlers_verify() {
+        let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+        assert_eq!(
+            program.activities[0].string_collections[0].name,
+            "destinations"
+        );
+        assert_eq!(program.activities[0].string_collections[0].items.len(), 3);
+        assert_eq!(program.activities[0].on_select[0].index, "index");
+        assert_eq!(program.activities[0].on_select[0].value, "value");
+        assert!(
+            matches!(program.activities[0].on_create.iter().find_map(|s| match &s.kind {
+            StatementKind::ListView { items, .. } => Some(items), _ => None,
+        }), Some(CollectionItems::State(name)) if name == "destinations")
+        );
+    }
+
+    #[test]
+    fn m9_collection_and_selection_diagnostics_are_stable() {
+        for (source, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-collection-empty.aic"),
+                "AIC1419",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-collection-type.aic"),
+                "AIC1421",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-collection-reassign.aic"),
+                "AIC1426",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-selection-target.aic"),
+                "AIC1422",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-selection-duplicate.aic"),
+                "AIC1423",
+            ),
+        ] {
+            assert_eq!(parse_program(source).unwrap_err().code, code);
+        }
+        let items = (0..101)
+            .map(|i| format!("\"Item {i}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let source = format!("aic_version 0.2 app \"Oversized\" package \"dev.aic.oversized\" {{ activity MainActivity {{ state items: string[] = [{items}] on_create {{ let list = android.list_view(items: items) android.set_content_view(list) }} }} }}");
+        assert_eq!(parse_program(&source).unwrap_err().code, "AIC1419");
+    }
+    #[test]
+    fn m9_bounded_scale_safe_text_sizes_verify() {
+        let source = "aic_version 0.2 app \"Text sizes\" package \"dev.aic.textsizes\" { activity MainActivity { on_create { let root = android.linear_layout(orientation: vertical) let text = android.text_view(text: \"Text\") let button = android.button(text: \"Button\") let edit = android.edit_text(hint: \"Edit\") let input = android.text_input(hint: \"Input\", input_type: text) let check = android.check_box(text: \"Check\") let toggle = android.switch(text: \"Switch\") android.set_text_size(view: text, size_sp: 1) android.set_text_size(view: button, size_sp: 200) android.set_text_size(view: edit, size_sp: 16) android.set_text_size(view: input, size_sp: 17) android.set_text_size(view: check, size_sp: 18) android.set_text_size(view: toggle, size_sp: 19) android.add_view(parent: root, child: text) android.set_content_view(root) } } }";
+        let program = parse_program(source).unwrap();
+        assert_eq!(
+            program
+                .activity
+                .on_create
+                .iter()
+                .filter(|statement| matches!(statement.kind, StatementKind::SetTextSize { .. }))
+                .count(),
+            6
+        );
+        for (fixture, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-text-size-type.aic"),
+                "AIC1427",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-text-size-range.aic"),
+                "AIC1427",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-text-size-target.aic"),
+                "AIC1428",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-text-size-unknown.aic"),
+                "AIC1105",
+            ),
+        ] {
+            assert_eq!(parse_program(fixture).unwrap_err().code, code);
+        }
+        for invalid in ["0", "-1", "201"] {
+            assert_eq!(
+                parse_program(&source.replace("size_sp: 1", &format!("size_sp: {invalid}")))
+                    .unwrap_err()
+                    .code,
+                "AIC1427"
+            );
+        }
+    }
+
+    #[test]
+    fn m9_input_labels_and_semantic_headings_verify() {
+        let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+        let statements = program
+            .activities
+            .iter()
+            .flat_map(|activity| &activity.on_create)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            statements
+                .iter()
+                .filter(|statement| matches!(statement.kind, StatementKind::SetInputLabel { .. }))
+                .count(),
+            1
+        );
+        assert_eq!(
+            statements
+                .iter()
+                .filter(|statement| matches!(statement.kind, StatementKind::SetHeading { .. }))
+                .count(),
+            2
+        );
+        for (fixture, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-input-label-label-target.aic"),
+                "AIC1429",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-input-label-input-target.aic"),
+                "AIC1430",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-heading-target.aic"),
+                "AIC1431",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-input-label-duplicate.aic"),
+                "AIC1432",
+            ),
+        ] {
+            assert_eq!(parse_program(fixture).unwrap_err().code, code);
+        }
+    }
+    #[test]
+    fn m9_minimum_touch_targets_verify() {
+        let valid = "aic_version 0.2 app \"Touch targets\" package \"dev.aic.touchtargets\" { activity MainActivity { on_create { let root = android.linear_layout(orientation: vertical) let button = android.button(text: \"Button\") let edit = android.edit_text(hint: \"Edit\") let input = android.text_input(hint: \"Input\", input_type: text) let check = android.check_box(text: \"Check\") let toggle = android.switch(text: \"Switch\") let spinner = android.spinner(items: [\"One\"]) let list = android.list_view(items: [\"One\"]) let toolbar = android.toolbar(title: \"Menu\") android.set_layout(view: button, width: 48, height: 48, weight: 0) android.set_layout(view: edit, width: wrap_content, height: wrap_content, weight: 0) android.set_layout(view: input, width: match_parent, height: match_parent, weight: 0) android.set_layout(view: check, width: 48, height: 48, weight: 0) android.set_layout(view: toggle, width: 48, height: 48, weight: 0) android.set_layout(view: spinner, width: 48, height: 48, weight: 0) android.set_layout(view: list, width: 48, height: 48, weight: 0) android.set_layout(view: toolbar, width: 48, height: 48, weight: 0) android.add_view(parent: root, child: button) android.set_content_view(root) } on_click(button) { android.show_menu(anchor: toolbar, item: \"Item\") } on_select(list, index, value) { android.set_text(view: button, text: value) } } }";
+        assert!(parse_program(valid).is_ok());
+
+        let non_interactive = "aic_version 0.2 app \"Small text\" package \"dev.aic.smalltext\" { activity MainActivity { on_create { let text = android.text_view(text: \"Text\") android.set_layout(view: text, width: 1, height: 1, weight: 0) android.set_content_view(text) } } }";
+        assert!(parse_program(non_interactive).is_ok());
+
+        for (fixture, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-touch-target-width.aic"),
+                "AIC1433",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-touch-target-height.aic"),
+                "AIC1434",
+            ),
+        ] {
+            let error = parse_program(fixture).unwrap_err();
+            assert_eq!(error.code, code);
+            assert!(error.location.is_some());
+        }
+
+        let layout_before_declaration = valid.replace(
+            "let button = android.button(text: \"Button\")",
+            "android.set_layout(view: button, width: 47, height: 48, weight: 0) let button = android.button(text: \"Button\")",
+        );
+        assert_eq!(
+            parse_program(&layout_before_declaration).unwrap_err().code,
+            "AIC1433"
+        );
+    }
+    #[test]
+    fn m9_accessibility_semantics_and_view_states_verify() {
+        let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+        assert_eq!(
+            program
+                .activity
+                .on_create
+                .iter()
+                .filter(|statement| matches!(statement.kind, StatementKind::SetDecorative { .. }))
+                .count(),
+            1
+        );
+        for (fixture, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-accessibility-missing.aic"),
+                "AIC1435",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-accessibility-empty.aic"),
+                "AIC1436",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-accessibility-conflict.aic"),
+                "AIC1437",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-decorative-duplicate.aic"),
+                "AIC1437",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-decorative-target.aic"),
+                "AIC1438",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-enabled-target.aic"),
+                "AIC1439",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-visibility-conflict.aic"),
+                "AIC1440",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-enabled-conflict.aic"),
+                "AIC1441",
+            ),
+        ] {
+            let error = parse_program(fixture).unwrap_err();
+            assert_eq!(error.code, code);
+            assert!(error.location.is_some());
+        }
+    }
+    #[test]
+    fn m9_literal_color_properties_verify() {
+        let source = "aic_version 0.2 app \"Colors\" package \"dev.aic.colors\" { activity MainActivity { on_create { let root = android.linear_layout(orientation: vertical) let text = android.text_view(text: \"Text\") let button = android.button(text: \"Button\") let edit = android.edit_text(hint: \"Edit\") let input = android.text_input(hint: \"Input\", input_type: text) let check = android.check_box(text: \"Check\") let toggle = android.switch(text: \"Switch\") let image = android.image_view(icon: info) android.set_text_color(view: text, color: \"#010203\") android.set_text_color(view: button, color: \"#FF040506\") android.set_text_color(view: edit, color: \"#070809\") android.set_text_color(view: input, color: \"#0A0B0C\") android.set_text_color(view: check, color: \"#0D0E0F\") android.set_text_color(view: toggle, color: \"#101112\") android.set_background_color(view: root, color: \"#131415\") android.set_background_color(view: text, color: \"#161718\") android.set_background_color(view: button, color: \"#191A1B\") android.set_background_color(view: image, color: \"#1C1D1E\") android.set_decorative(view: image) android.add_view(parent: root, child: text) android.set_content_view(root) } } }";
+        let program = parse_program(source).unwrap();
+        assert_eq!(
+            program
+                .activity
+                .on_create
+                .iter()
+                .filter(|statement| matches!(statement.kind, StatementKind::SetTextColor { .. }))
+                .count(),
+            6
+        );
+        assert_eq!(
+            program
+                .activity
+                .on_create
+                .iter()
+                .filter(|statement| matches!(
+                    statement.kind,
+                    StatementKind::SetBackgroundColor { .. }
+                ))
+                .count(),
+            4
+        );
+        for (fixture, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-text-color-target.aic"),
+                "AIC1442",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-color-format.aic"),
+                "AIC1014",
+            ),
+        ] {
+            let error = parse_program(fixture).unwrap_err();
+            assert_eq!(error.code, code);
+            assert!(error.location.is_some());
+        }
+        let unknown = source.replace(
+            "android.set_background_color(view: root, color: \"#131415\")",
+            "android.set_background_color(view: missing, color: \"#131415\")",
+        );
+        assert_eq!(parse_program(&unknown).unwrap_err().code, "AIC1105");
+
+        let legacy = include_str!("../../../testdata/invalid/m9-text-color-target.aic")
+            .replace("aic_version 0.2", "aic_version 0.1");
+        assert!(parse_program(&legacy).is_ok());
     }
     #[test]
     fn m2() {

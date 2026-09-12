@@ -1,0 +1,1 @@
+aic_version 0.2 app "Bad decorative target" package "dev.aic.baddecorative" { activity MainActivity { on_create { let text = android.text_view(text: "Text") android.set_decorative(view: text) android.set_content_view(text) } } }

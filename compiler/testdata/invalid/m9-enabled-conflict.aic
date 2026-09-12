@@ -1,0 +1,1 @@
+aic_version 0.2 app "Enabled conflict" package "dev.aic.enabledconflict" { activity MainActivity { on_create { let button = android.button(text: "Button") android.set_enabled(view: button, enabled: true) android.set_enabled(view: button, enabled: false) android.set_content_view(button) } } }

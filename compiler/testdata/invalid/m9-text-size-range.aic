@@ -1,0 +1,9 @@
+aic_version 0.2 app "Invalid Text Size" package "dev.aic.invalid" {
+  activity MainActivity {
+    on_create {
+      let title = android.text_view(text: "Title")
+      android.set_text_size(view: title, size_sp: 201)
+      android.set_content_view(title)
+    }
+  }
+}

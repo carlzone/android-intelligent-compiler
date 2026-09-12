@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use aic_ir::{
-    Capability, Expression, ExpressionKind, Function, Program, Statement, StatementKind, Type,
-    Value,
+    Capability, CollectionItems, Expression, ExpressionKind, Function, Program, Statement,
+    StatementKind, Type, Value,
 };
 
 use crate::{
@@ -54,6 +54,8 @@ impl Pool {
         let runtime = !functions.is_empty()
             || !program.activity.state.is_empty()
             || !program.activity.on_click.is_empty()
+            || !program.activity.on_select.is_empty()
+            || !program.activity.string_collections.is_empty()
             || !program.capabilities.is_empty();
         let key_value = program.capabilities.contains(&Capability::KeyValue);
         let sqlite = program.capabilities.contains(&Capability::Sqlite);
@@ -97,6 +99,66 @@ impl Pool {
             Proto {
                 ret: "I",
                 params: vec!["Ljava/lang/String;"],
+            },
+            Proto {
+                ret: "Landroid/content/Intent;",
+                params: vec!["Landroid/content/Context;", "Ljava/lang/String;"],
+            },
+            Proto {
+                ret: "Landroid/content/Intent;",
+                params: vec!["Ljava/lang/String;", "I"],
+            },
+            Proto {
+                ret: "Landroid/content/Intent;",
+                params: vec!["Ljava/lang/String;", "Z"],
+            },
+            Proto {
+                ret: "Landroid/content/Intent;",
+                params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["Landroid/content/Intent;"],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["I", "I", "I", "I"],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["Z"],
+            },
+            Proto {
+                ret: "Landroid/app/AlertDialog$Builder;",
+                params: vec!["Ljava/lang/CharSequence;"],
+            },
+            Proto {
+                ret: "Landroid/app/AlertDialog;",
+                params: vec![],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["Landroid/content/Context;", "Landroid/view/View;"],
+            },
+            Proto {
+                ret: "Landroid/view/Menu;",
+                params: vec![],
+            },
+            Proto {
+                ret: "Landroid/view/MenuItem;",
+                params: vec!["Ljava/lang/CharSequence;"],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["Landroid/content/Context;", "I", "[Ljava/lang/Object;"],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["Landroid/widget/ListAdapter;"],
+            },
+            Proto {
+                ret: "V",
+                params: vec!["Landroid/widget/SpinnerAdapter;"],
             },
         ];
         if runtime {
@@ -213,11 +275,28 @@ impl Pool {
             ]);
         }
         let mut fields = Vec::new();
+        fields.push(Field {
+            class: "Landroid/util/DisplayMetrics;".into(),
+            name: "densityDpi".into(),
+            ty: "I".into(),
+        });
+        fields.push(Field {
+            class: class.into(),
+            name: "platform$minimumTouchTarget".into(),
+            ty: "I".into(),
+        });
         for state in &program.activity.state {
             fields.push(Field {
                 class: class.into(),
                 name: state.name.clone(),
                 ty: type_descriptor(state.ty).into(),
+            });
+        }
+        for collection in &program.activity.string_collections {
+            fields.push(Field {
+                class: class.into(),
+                name: collection.name.clone(),
+                ty: "[Ljava/lang/String;".into(),
             });
         }
         for statement in &program.activity.on_create {
@@ -227,6 +306,11 @@ impl Pool {
                     name: format!("view${id}"),
                     ty: ty.into(),
                 });
+            }
+        }
+        for handler in &program.activity.on_select {
+            if program.activity.on_create.iter().any(|statement| matches!(&statement.kind, StatementKind::Spinner { id, .. } if id == &handler.view)) {
+                fields.push(Field { class: class.into(), name: format!("selectionReady${}", handler.view), ty: "Z".into() });
             }
         }
         if key_value {
@@ -243,7 +327,21 @@ impl Pool {
                 ty: "Landroid/database/sqlite/SQLiteDatabase;".into(),
             });
         }
+        if program
+            .activity
+            .on_create
+            .iter()
+            .any(|statement| matches!(statement.kind, StatementKind::SetHeading { .. }))
+        {
+            fields.push(Field {
+                class: "Landroid/os/Build$VERSION;".into(),
+                name: "SDK_INT".into(),
+                ty: "I".into(),
+            });
+        }
         let interactive = !program.activity.on_click.is_empty();
+        let has_list_selection = program.activity.on_select.iter().any(|handler| program.activity.on_create.iter().any(|statement| matches!(&statement.kind, StatementKind::ListView { id, .. } if id == &handler.view)));
+        let has_spinner_selection = program.activity.on_select.iter().any(|handler| program.activity.on_create.iter().any(|statement| matches!(&statement.kind, StatementKind::Spinner { id, .. } if id == &handler.view)));
         let mut methods = vec![
             Method {
                 class: class.to_owned(),
@@ -266,9 +364,43 @@ impl Pool {
                 proto: protos[1].clone(),
             },
             Method {
+                class: "Landroid/content/Context;".into(),
+                name: "getResources".into(),
+                proto: Proto {
+                    ret: "Landroid/content/res/Resources;",
+                    params: vec![],
+                },
+            },
+            Method {
+                class: "Landroid/content/res/Resources;".into(),
+                name: "getDisplayMetrics".into(),
+                proto: Proto {
+                    ret: "Landroid/util/DisplayMetrics;",
+                    params: vec![],
+                },
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setMinimumWidth".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setMinimumHeight".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
                 class: "Landroid/app/Activity;".into(),
                 name: "setContentView".into(),
                 proto: protos[5].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setFitsSystemWindows".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Z"],
+                },
             },
             Method {
                 class: "Landroid/widget/LinearLayout;".into(),
@@ -289,6 +421,14 @@ impl Pool {
                 class: "Landroid/widget/TextView;".into(),
                 name: "setText".into(),
                 proto: protos[4].clone(),
+            },
+            Method {
+                class: "Landroid/widget/TextView;".into(),
+                name: "setTextSize".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["I", "F"],
+                },
             },
             Method {
                 class: "Landroid/widget/Button;".into(),
@@ -316,14 +456,191 @@ impl Pool {
                 proto: protos[2].clone(),
             },
             Method {
+                class: "Landroid/widget/FrameLayout;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/CheckBox;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/Switch;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/ProgressBar;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/ImageView;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/ImageView;".into(),
+                name: "setImageResource".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/widget/Toolbar;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/Toolbar;".into(),
+                name: "setTitle".into(),
+                proto: protos[4].clone(),
+            },
+            Method {
+                class: "Landroid/app/AlertDialog$Builder;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/app/AlertDialog$Builder;".into(),
+                name: "setTitle".into(),
+                proto: Proto {
+                    ret: "Landroid/app/AlertDialog$Builder;",
+                    params: vec!["Ljava/lang/CharSequence;"],
+                },
+            },
+            Method {
+                class: "Landroid/app/AlertDialog$Builder;".into(),
+                name: "setMessage".into(),
+                proto: Proto {
+                    ret: "Landroid/app/AlertDialog$Builder;",
+                    params: vec!["Ljava/lang/CharSequence;"],
+                },
+            },
+            Method {
+                class: "Landroid/app/AlertDialog$Builder;".into(),
+                name: "show".into(),
+                proto: Proto {
+                    ret: "Landroid/app/AlertDialog;",
+                    params: vec![],
+                },
+            },
+            Method {
+                class: "Landroid/widget/PopupMenu;".into(),
+                name: "<init>".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Landroid/content/Context;", "Landroid/view/View;"],
+                },
+            },
+            Method {
+                class: "Landroid/widget/PopupMenu;".into(),
+                name: "getMenu".into(),
+                proto: Proto {
+                    ret: "Landroid/view/Menu;",
+                    params: vec![],
+                },
+            },
+            Method {
+                class: "Landroid/view/Menu;".into(),
+                name: "add".into(),
+                proto: Proto {
+                    ret: "Landroid/view/MenuItem;",
+                    params: vec!["Ljava/lang/CharSequence;"],
+                },
+            },
+            Method {
+                class: "Landroid/widget/PopupMenu;".into(),
+                name: "show".into(),
+                proto: protos[0].clone(),
+            },
+            Method {
+                class: "Landroid/widget/ListView;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/Spinner;".into(),
+                name: "<init>".into(),
+                proto: protos[2].clone(),
+            },
+            Method {
+                class: "Landroid/widget/ArrayAdapter;".into(),
+                name: "<init>".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Landroid/content/Context;", "I", "[Ljava/lang/Object;"],
+                },
+            },
+            Method {
+                class: "Landroid/widget/ListView;".into(),
+                name: "setAdapter".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Landroid/widget/ListAdapter;"],
+                },
+            },
+            Method {
+                class: "Landroid/widget/ArrayAdapter;".into(),
+                name: "setDropDownViewResource".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/widget/Spinner;".into(),
+                name: "setAdapter".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Landroid/widget/SpinnerAdapter;"],
+                },
+            },
+            Method {
                 class: "Landroid/view/View;".into(),
                 name: "setOnClickListener".into(),
                 proto: protos[6].clone(),
             },
             Method {
+                class: "Landroid/widget/ListView;".into(),
+                name: "setOnItemClickListener".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Landroid/widget/AdapterView$OnItemClickListener;"],
+                },
+            },
+            Method {
+                class: "Landroid/widget/Spinner;".into(),
+                name: "setOnItemSelectedListener".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Landroid/widget/AdapterView$OnItemSelectedListener;"],
+                },
+            },
+            Method {
+                class: "Landroid/widget/AdapterView;".into(),
+                name: "getItemAtPosition".into(),
+                proto: Proto {
+                    ret: "Ljava/lang/Object;",
+                    params: vec!["I"],
+                },
+            },
+            Method {
+                class: "Ljava/lang/Object;".into(),
+                name: "toString".into(),
+                proto: Proto {
+                    ret: "Ljava/lang/String;",
+                    params: vec![],
+                },
+            },
+            Method {
                 class: "Landroid/widget/LinearLayout$LayoutParams;".into(),
                 name: "<init>".into(),
                 proto: protos[7].clone(),
+            },
+            Method {
+                class: "Landroid/view/ViewGroup$MarginLayoutParams;".into(),
+                name: "setMargins".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["I", "I", "I", "I"],
+                },
             },
             Method {
                 class: "Landroid/view/View;".into(),
@@ -353,12 +670,155 @@ impl Pool {
                 name: "addView".into(),
                 proto: protos[5].clone(),
             },
+            Method {
+                class: "Landroid/content/Intent;".into(),
+                name: "<init>".into(),
+                proto: protos[0].clone(),
+            },
+            Method {
+                class: "Landroid/content/Intent;".into(),
+                name: "setClassName".into(),
+                proto: Proto {
+                    ret: "Landroid/content/Intent;",
+                    params: vec!["Landroid/content/Context;", "Ljava/lang/String;"],
+                },
+            },
+            Method {
+                class: "Landroid/content/Intent;".into(),
+                name: "putExtra".into(),
+                proto: Proto {
+                    ret: "Landroid/content/Intent;",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+            },
+            Method {
+                class: "Landroid/content/Intent;".into(),
+                name: "putExtra".into(),
+                proto: Proto {
+                    ret: "Landroid/content/Intent;",
+                    params: vec!["Ljava/lang/String;", "Z"],
+                },
+            },
+            Method {
+                class: "Landroid/content/Intent;".into(),
+                name: "putExtra".into(),
+                proto: Proto {
+                    ret: "Landroid/content/Intent;",
+                    params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                },
+            },
+            Method {
+                class: "Landroid/app/Activity;".into(),
+                name: "startActivity".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Landroid/content/Intent;"],
+                },
+            },
+            Method {
+                class: "Landroid/app/Activity;".into(),
+                name: "finish".into(),
+                proto: protos[0].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setPadding".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["I", "I", "I", "I"],
+                },
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setVisibility".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setEnabled".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Z"],
+                },
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setContentDescription".into(),
+                proto: protos[4].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setImportantForAccessibility".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "generateViewId".into(),
+                proto: Proto {
+                    ret: "I",
+                    params: vec![],
+                },
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setId".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/widget/TextView;".into(),
+                name: "setLabelFor".into(),
+                proto: protos[3].clone(),
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setAccessibilityHeading".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Z"],
+                },
+            },
+            Method {
+                class: "Landroid/view/View;".into(),
+                name: "setTextAlignment".into(),
+                proto: protos[3].clone(),
+            },
         ];
         if interactive {
             methods.push(Method {
                 class: class.into(),
                 name: "onClick".into(),
                 proto: protos[5].clone(),
+            });
+        }
+        let selection_proto = Proto {
+            ret: "V",
+            params: vec![
+                "Landroid/widget/AdapterView;",
+                "Landroid/view/View;",
+                "I",
+                "J",
+            ],
+        };
+        if has_list_selection {
+            methods.push(Method {
+                class: class.into(),
+                name: "onItemClick".into(),
+                proto: selection_proto.clone(),
+            });
+        }
+        if has_spinner_selection {
+            methods.push(Method {
+                class: class.into(),
+                name: "onItemSelected".into(),
+                proto: selection_proto,
+            });
+            methods.push(Method {
+                class: class.into(),
+                name: "onNothingSelected".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Landroid/widget/AdapterView;"],
+                },
             });
         }
         if runtime {
@@ -619,11 +1079,18 @@ impl Pool {
             class,
             "Landroid/app/Activity;",
             "Landroid/content/Context;",
+            "Landroid/content/Intent;",
+            "Landroid/content/res/Resources;",
+            "Landroid/util/DisplayMetrics;",
             "Landroid/os/Bundle;",
             "Landroid/view/View;",
             "Landroid/view/ViewGroup;",
             "Landroid/view/View$OnClickListener;",
+            "Landroid/widget/AdapterView;",
+            "Landroid/widget/AdapterView$OnItemClickListener;",
+            "Landroid/widget/AdapterView$OnItemSelectedListener;",
             "Landroid/view/ViewGroup$LayoutParams;",
+            "Landroid/view/ViewGroup$MarginLayoutParams;",
             "Landroid/widget/LinearLayout$LayoutParams;",
             "Landroid/graphics/Color;",
             "Landroid/widget/LinearLayout;",
@@ -631,25 +1098,85 @@ impl Pool {
             "Landroid/widget/Button;",
             "Landroid/widget/EditText;",
             "Landroid/widget/ScrollView;",
+            "Landroid/widget/FrameLayout;",
+            "Landroid/widget/CheckBox;",
+            "Landroid/widget/Switch;",
+            "Landroid/widget/ProgressBar;",
+            "Landroid/widget/ImageView;",
+            "Landroid/widget/Toolbar;",
+            "Landroid/widget/PopupMenu;",
+            "Landroid/app/AlertDialog$Builder;",
+            "Landroid/app/AlertDialog;",
+            "Landroid/view/Menu;",
+            "Landroid/view/MenuItem;",
+            "Landroid/widget/ListView;",
+            "Landroid/widget/Spinner;",
+            "Landroid/widget/SpinnerAdapter;",
+            "Landroid/widget/ArrayAdapter;",
+            "Landroid/widget/ListAdapter;",
+            "[Ljava/lang/String;",
+            "[Ljava/lang/Object;",
             "Ljava/lang/CharSequence;",
+            "Ljava/lang/Object;",
             "Ljava/lang/String;",
             "I",
+            "J",
             "V",
             "Z",
             "<init>",
             "onCreate",
             "setContentView",
+            "getResources",
+            "getDisplayMetrics",
+            "densityDpi",
+            "platform$minimumTouchTarget",
+            "setMinimumWidth",
+            "setMinimumHeight",
+            "setFitsSystemWindows",
             "setOrientation",
             "setText",
+            "setTextSize",
             "setHint",
             "setInputType",
             "addView",
             "onClick",
             "setOnClickListener",
+            "setOnItemClickListener",
+            "setOnItemSelectedListener",
+            "getItemAtPosition",
+            "toString",
+            "onItemClick",
+            "onItemSelected",
+            "onNothingSelected",
             "setLayoutParams",
+            "setMargins",
             "parseColor",
             "setTextColor",
             "setBackgroundColor",
+            "setImageResource",
+            "setTitle",
+            "setMessage",
+            "show",
+            "getMenu",
+            "add",
+            "setAdapter",
+            "setDropDownViewResource",
+            "setClassName",
+            "putExtra",
+            "startActivity",
+            "finish",
+            "setPadding",
+            "setVisibility",
+            "setEnabled",
+            "setContentDescription",
+            "setImportantForAccessibility",
+            "generateViewId",
+            "setId",
+            "setLabelFor",
+            "setAccessibilityHeading",
+            "Landroid/os/Build$VERSION;",
+            "SDK_INT",
+            "setTextAlignment",
             "F",
         ] {
             strings.insert(value.to_owned());
@@ -722,8 +1249,12 @@ impl Pool {
         for handler in &program.activity.on_click {
             collect_persistence_sql(&handler.body, program, &mut strings);
         }
+        for handler in &program.activity.on_select {
+            collect_persistence_sql(&handler.body, program, &mut strings);
+        }
         collect_program_strings(program, &mut strings);
         strings.extend(fields.iter().map(|field| field.name.clone()));
+        protos.extend(methods.iter().map(|method| method.proto.clone()));
         for proto in &protos {
             strings.insert(shorty(proto));
         }
@@ -751,6 +1282,7 @@ impl Pool {
             descriptors.insert(field.class.clone());
             descriptors.insert(field.ty.clone());
         }
+        descriptors.insert("[Ljava/lang/String;".into());
         let mut types: Vec<u32> = descriptors.iter().map(|d| string_index[d]).collect();
         types.sort_unstable();
         let type_index: BTreeMap<String, u16> = types
@@ -783,6 +1315,9 @@ impl Pool {
                 string_index[&m.name],
                 proto_index(&m.proto).unwrap(),
             )
+        });
+        methods.dedup_by(|left, right| {
+            left.class == right.class && left.name == right.name && left.proto == right.proto
         });
         fields.sort_by_key(|f| {
             (
@@ -831,15 +1366,7 @@ fn type_descriptor(ty: Type) -> &'static str {
     }
 }
 fn view_id(statement: &Statement) -> Option<&str> {
-    match &statement.kind {
-        StatementKind::LinearLayout { id, .. }
-        | StatementKind::TextView { id, .. }
-        | StatementKind::Button { id, .. }
-        | StatementKind::EditText { id, .. }
-        | StatementKind::TextInput { id, .. }
-        | StatementKind::ScrollView { id } => Some(id),
-        _ => None,
-    }
+    view_field(statement).map(|entry| entry.0)
 }
 fn view_field(statement: &Statement) -> Option<(&str, &'static str)> {
     match &statement.kind {
@@ -850,6 +1377,14 @@ fn view_field(statement: &Statement) -> Option<(&str, &'static str)> {
             Some((id, "Landroid/widget/EditText;"))
         }
         StatementKind::ScrollView { id } => Some((id, "Landroid/widget/ScrollView;")),
+        StatementKind::FrameLayout { id } => Some((id, "Landroid/widget/FrameLayout;")),
+        StatementKind::CheckBox { id, .. } => Some((id, "Landroid/widget/CheckBox;")),
+        StatementKind::Switch { id, .. } => Some((id, "Landroid/widget/Switch;")),
+        StatementKind::ProgressBar { id } => Some((id, "Landroid/widget/ProgressBar;")),
+        StatementKind::ImageView { id, .. } => Some((id, "Landroid/widget/ImageView;")),
+        StatementKind::Toolbar { id, .. } => Some((id, "Landroid/widget/Toolbar;")),
+        StatementKind::ListView { id, .. } => Some((id, "Landroid/widget/ListView;")),
+        StatementKind::Spinner { id, .. } => Some((id, "Landroid/widget/Spinner;")),
         _ => None,
     }
 }
@@ -862,8 +1397,16 @@ fn collect_program_strings(program: &Program, strings: &mut BTreeSet<String>) {
     for handler in &program.activity.on_click {
         collect_statement_strings(&handler.body, strings);
     }
+    for handler in &program.activity.on_select {
+        collect_statement_strings(&handler.body, strings);
+    }
     for state in &program.activity.state {
         collect_expression_strings(&state.initial, strings);
+    }
+    for collection in &program.activity.string_collections {
+        for item in &collection.items {
+            collect_expression_strings(item, strings);
+        }
     }
     for preference in &program.preferences {
         if let Value::String(value) = &preference.default {
@@ -882,8 +1425,20 @@ fn collect_statement_strings(statements: &[Statement], strings: &mut BTreeSet<St
             | StatementKind::Button { text: value, .. }
             | StatementKind::EditText { hint: value, .. }
             | StatementKind::TextInput { hint: value, .. }
-            | StatementKind::SetText { text: value, .. } => {
+            | StatementKind::CheckBox { text: value, .. }
+            | StatementKind::Switch { text: value, .. }
+            | StatementKind::Toolbar { title: value, .. }
+            | StatementKind::SetText { text: value, .. }
+            | StatementKind::SetEnabled { enabled: value, .. }
+            | StatementKind::SetContentDescription { text: value, .. } => {
                 collect_expression_strings(value, strings);
+            }
+            StatementKind::ListView { items, .. } | StatementKind::Spinner { items, .. } => {
+                if let CollectionItems::Inline(items) = items {
+                    for item in items {
+                        collect_expression_strings(item, strings);
+                    }
+                }
             }
             StatementKind::SetTextColor { color, .. }
             | StatementKind::SetBackgroundColor { color, .. } => {
@@ -905,6 +1460,18 @@ fn collect_statement_strings(statements: &[Statement], strings: &mut BTreeSet<St
                 strings.insert(table.clone());
                 collect_expression_strings(id, strings);
             }
+            StatementKind::StartActivity { activity, extras } => {
+                strings.insert(activity.clone());
+                for (key, value) in extras {
+                    strings.insert(key.clone());
+                    collect_expression_strings(value, strings);
+                }
+            }
+            StatementKind::ShowDialog { title, message } => {
+                collect_expression_strings(title, strings);
+                collect_expression_strings(message, strings);
+            }
+            StatementKind::ShowMenu { item, .. } => collect_expression_strings(item, strings),
             StatementKind::If {
                 condition,
                 then_body,
@@ -922,10 +1489,21 @@ fn collect_statement_strings(statements: &[Statement], strings: &mut BTreeSet<St
                 collect_statement_strings(body, strings);
             }
             StatementKind::LinearLayout { .. }
+            | StatementKind::SetTextSize { .. }
+            | StatementKind::SetInputLabel { .. }
+            | StatementKind::SetHeading { .. }
+            | StatementKind::SetDecorative { .. }
             | StatementKind::ScrollView { .. }
+            | StatementKind::FrameLayout { .. }
+            | StatementKind::ProgressBar { .. }
+            | StatementKind::ImageView { .. }
             | StatementKind::AddView { .. }
             | StatementKind::SetContentView { .. }
-            | StatementKind::SetLayout { .. } => {}
+            | StatementKind::SetLayout { .. }
+            | StatementKind::SetPadding { .. }
+            | StatementKind::SetVisibility { .. }
+            | StatementKind::SetGravity { .. }
+            | StatementKind::FinishActivity => {}
         }
     }
 }
@@ -1153,7 +1731,9 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
     let functions = &program.functions;
     let runtime = !functions.is_empty()
         || !program.activity.state.is_empty()
-        || !program.activity.on_click.is_empty();
+        || !program.activity.on_click.is_empty()
+        || !program.activity.on_select.is_empty()
+        || !program.activity.string_collections.is_empty();
     let p0 = Proto {
         ret: "V",
         params: vec![],
@@ -1463,6 +2043,11 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             text_view_type: pool.type_index["Landroid/widget/TextView;"],
             text_view_init: pool.method("Landroid/widget/TextView;", "<init>", &pc)?,
             text_view_set_text: pool.method("Landroid/widget/TextView;", "setText", &ps)?,
+            text_view_set_text_size: pool.method(
+                "Landroid/widget/TextView;",
+                "setTextSize",
+                &Proto { ret: "V", params: vec!["I", "F"] },
+            )?,
             button_type: pool.type_index["Landroid/widget/Button;"],
             button_init: pool.method("Landroid/widget/Button;", "<init>", &pc)?,
             edit_text_type: pool.type_index["Landroid/widget/EditText;"],
@@ -1475,6 +2060,59 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             )?,
             scroll_view_type: pool.type_index["Landroid/widget/ScrollView;"],
             scroll_view_init: pool.method("Landroid/widget/ScrollView;", "<init>", &pc)?,
+            frame_layout_type: pool.type_index["Landroid/widget/FrameLayout;"],
+            frame_layout_init: pool.method("Landroid/widget/FrameLayout;", "<init>", &pc)?,
+            check_box_type: pool.type_index["Landroid/widget/CheckBox;"],
+            check_box_init: pool.method("Landroid/widget/CheckBox;", "<init>", &pc)?,
+            switch_type: pool.type_index["Landroid/widget/Switch;"],
+            switch_init: pool.method("Landroid/widget/Switch;", "<init>", &pc)?,
+            progress_bar_type: pool.type_index["Landroid/widget/ProgressBar;"],
+            progress_bar_init: pool.method("Landroid/widget/ProgressBar;", "<init>", &pc)?,
+            image_view_type: pool.type_index["Landroid/widget/ImageView;"],
+            image_view_init: pool.method("Landroid/widget/ImageView;", "<init>", &pc)?,
+            image_view_set_resource: pool.method(
+                "Landroid/widget/ImageView;",
+                "setImageResource",
+                &pi,
+            )?,
+            toolbar_type: pool.type_index["Landroid/widget/Toolbar;"],
+            toolbar_init: pool.method("Landroid/widget/Toolbar;", "<init>", &pc)?,
+            toolbar_set_title: pool.method("Landroid/widget/Toolbar;", "setTitle", &ps)?,
+            list_view_type: pool.type_index["Landroid/widget/ListView;"],
+            list_view_init: pool.method("Landroid/widget/ListView;", "<init>", &pc)?,
+            spinner_type: pool.type_index["Landroid/widget/Spinner;"],
+            spinner_init: pool.method("Landroid/widget/Spinner;", "<init>", &pc)?,
+            string_array_type: pool.type_index["[Ljava/lang/String;"],
+            array_adapter_type: pool.type_index["Landroid/widget/ArrayAdapter;"],
+            array_adapter_init: pool.method(
+                "Landroid/widget/ArrayAdapter;",
+                "<init>",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Landroid/content/Context;", "I", "[Ljava/lang/Object;"],
+                },
+            )?,
+            array_adapter_set_drop_down_view_resource: pool.method(
+                "Landroid/widget/ArrayAdapter;",
+                "setDropDownViewResource",
+                &pi,
+            )?,
+            list_view_set_adapter: pool.method(
+                "Landroid/widget/ListView;",
+                "setAdapter",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Landroid/widget/ListAdapter;"],
+                },
+            )?,
+            spinner_set_adapter: pool.method(
+                "Landroid/widget/Spinner;",
+                "setAdapter",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Landroid/widget/SpinnerAdapter;"],
+                },
+            )?,
             set_on_click_listener: pool.method(
                 "Landroid/view/View;",
                 "setOnClickListener",
@@ -1483,6 +2121,10 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                     params: vec!["Landroid/view/View$OnClickListener;"],
                 },
             )?,
+            list_view_set_on_item_click_listener: pool.method("Landroid/widget/ListView;", "setOnItemClickListener", &Proto { ret: "V", params: vec!["Landroid/widget/AdapterView$OnItemClickListener;"] })?,
+            spinner_set_on_item_selected_listener: pool.method("Landroid/widget/Spinner;", "setOnItemSelectedListener", &Proto { ret: "V", params: vec!["Landroid/widget/AdapterView$OnItemSelectedListener;"] })?,
+            adapter_view_get_item_at_position: pool.method("Landroid/widget/AdapterView;", "getItemAtPosition", &Proto { ret: "Ljava/lang/Object;", params: vec!["I"] })?,
+            object_to_string: pool.method("Ljava/lang/Object;", "toString", &Proto { ret: "Ljava/lang/String;", params: vec![] })?,
             layout_params_type: pool.type_index["Landroid/widget/LinearLayout$LayoutParams;"],
             layout_params_init: pool.method(
                 "Landroid/widget/LinearLayout$LayoutParams;",
@@ -1490,6 +2132,14 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 &Proto {
                     ret: "V",
                     params: vec!["I", "I", "F"],
+                },
+            )?,
+            layout_params_set_margins: pool.method(
+                "Landroid/view/ViewGroup$MarginLayoutParams;",
+                "setMargins",
+                &Proto {
+                    ret: "V",
+                    params: vec!["I", "I", "I", "I"],
                 },
             )?,
             set_layout_params: pool.method(
@@ -1511,7 +2161,172 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             set_text_color: pool.method("Landroid/widget/TextView;", "setTextColor", &pi)?,
             set_background_color: pool.method("Landroid/view/View;", "setBackgroundColor", &pi)?,
             add_view: pool.method("Landroid/view/ViewGroup;", "addView", &pv)?,
+            set_fits_system_windows: pool.method(
+                "Landroid/view/View;",
+                "setFitsSystemWindows",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Z"],
+                },
+            )?,
             set_content_view: pool.method("Landroid/app/Activity;", "setContentView", &pv)?,
+            intent_type: pool.type_index["Landroid/content/Intent;"],
+            intent_init: pool.method("Landroid/content/Intent;", "<init>", &p0)?,
+            intent_set_class_name: pool.method(
+                "Landroid/content/Intent;",
+                "setClassName",
+                &Proto {
+                    ret: "Landroid/content/Intent;",
+                    params: vec!["Landroid/content/Context;", "Ljava/lang/String;"],
+                },
+            )?,
+            intent_put_i32: pool.method(
+                "Landroid/content/Intent;",
+                "putExtra",
+                &Proto {
+                    ret: "Landroid/content/Intent;",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+            )?,
+            intent_put_bool: pool.method(
+                "Landroid/content/Intent;",
+                "putExtra",
+                &Proto {
+                    ret: "Landroid/content/Intent;",
+                    params: vec!["Ljava/lang/String;", "Z"],
+                },
+            )?,
+            intent_put_string: pool.method(
+                "Landroid/content/Intent;",
+                "putExtra",
+                &Proto {
+                    ret: "Landroid/content/Intent;",
+                    params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                },
+            )?,
+            start_activity: pool.method(
+                "Landroid/app/Activity;",
+                "startActivity",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Landroid/content/Intent;"],
+                },
+            )?,
+            finish_activity: pool.method("Landroid/app/Activity;", "finish", &p0)?,
+            set_padding: pool.method(
+                "Landroid/view/View;",
+                "setPadding",
+                &Proto {
+                    ret: "V",
+                    params: vec!["I", "I", "I", "I"],
+                },
+            )?,
+            set_visibility: pool.method("Landroid/view/View;", "setVisibility", &pi)?,
+            set_enabled: pool.method(
+                "Landroid/view/View;",
+                "setEnabled",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Z"],
+                },
+            )?,
+            set_content_description: pool.method(
+                "Landroid/view/View;",
+                "setContentDescription",
+                &ps,
+            )?,
+            set_important_for_accessibility: pool.method(
+                "Landroid/view/View;",
+                "setImportantForAccessibility",
+                &pi,
+            )?,
+            context_get_resources: pool.method(
+                "Landroid/content/Context;",
+                "getResources",
+                &Proto { ret: "Landroid/content/res/Resources;", params: vec![] },
+            )?,
+            resources_get_display_metrics: pool.method(
+                "Landroid/content/res/Resources;",
+                "getDisplayMetrics",
+                &Proto { ret: "Landroid/util/DisplayMetrics;", params: vec![] },
+            )?,
+            display_metrics_density_dpi: pool.field(
+                "Landroid/util/DisplayMetrics;",
+                "densityDpi",
+            )?,
+            minimum_touch_target_field: pool.field(class, "platform$minimumTouchTarget")?,
+            set_minimum_width: pool.method("Landroid/view/View;", "setMinimumWidth", &pi)?,
+            set_minimum_height: pool.method("Landroid/view/View;", "setMinimumHeight", &pi)?,
+            generate_view_id: pool.method(
+                "Landroid/view/View;",
+                "generateViewId",
+                &Proto { ret: "I", params: vec![] },
+            )?,
+            set_view_id: pool.method("Landroid/view/View;", "setId", &pi)?,
+            text_view_set_label_for: pool.method(
+                "Landroid/widget/TextView;",
+                "setLabelFor",
+                &pi,
+            )?,
+            set_accessibility_heading: pool.method(
+                "Landroid/view/View;",
+                "setAccessibilityHeading",
+                &Proto { ret: "V", params: vec!["Z"] },
+            )?,
+            sdk_int_field: pool.field("Landroid/os/Build$VERSION;", "SDK_INT").ok(),
+            set_text_alignment: pool.method("Landroid/view/View;", "setTextAlignment", &pi)?,
+            dialog_builder_type: pool.type_index["Landroid/app/AlertDialog$Builder;"],
+            dialog_builder_init: pool.method("Landroid/app/AlertDialog$Builder;", "<init>", &pc)?,
+            dialog_set_title: pool.method(
+                "Landroid/app/AlertDialog$Builder;",
+                "setTitle",
+                &Proto {
+                    ret: "Landroid/app/AlertDialog$Builder;",
+                    params: vec!["Ljava/lang/CharSequence;"],
+                },
+            )?,
+            dialog_set_message: pool.method(
+                "Landroid/app/AlertDialog$Builder;",
+                "setMessage",
+                &Proto {
+                    ret: "Landroid/app/AlertDialog$Builder;",
+                    params: vec!["Ljava/lang/CharSequence;"],
+                },
+            )?,
+            dialog_show: pool.method(
+                "Landroid/app/AlertDialog$Builder;",
+                "show",
+                &Proto {
+                    ret: "Landroid/app/AlertDialog;",
+                    params: vec![],
+                },
+            )?,
+            popup_menu_type: pool.type_index["Landroid/widget/PopupMenu;"],
+            popup_menu_init: pool.method(
+                "Landroid/widget/PopupMenu;",
+                "<init>",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Landroid/content/Context;", "Landroid/view/View;"],
+                },
+            )?,
+            popup_menu_get_menu: pool.method(
+                "Landroid/widget/PopupMenu;",
+                "getMenu",
+                &Proto {
+                    ret: "Landroid/view/Menu;",
+                    params: vec![],
+                },
+            )?,
+            menu_add: pool.method(
+                "Landroid/view/Menu;",
+                "add",
+                &Proto {
+                    ret: "Landroid/view/MenuItem;",
+                    params: vec!["Ljava/lang/CharSequence;"],
+                },
+            )?,
+            popup_menu_show: pool.method("Landroid/widget/PopupMenu;", "show", &p0)?,
         },
         program
             .activity
@@ -1524,6 +2339,13 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 ))
             })
             .collect::<Result<BTreeMap<_, _>, DexError>>()?,
+        program.activity.string_collections.iter().map(|collection| {
+            Ok((collection.name.clone(), pool.field(class, &collection.name)?))
+        }).collect::<Result<BTreeMap<_, _>, DexError>>()?,
+        program.activity.on_select.iter().map(|handler| {
+            let spinner = program.activity.on_create.iter().any(|statement| matches!(&statement.kind, StatementKind::Spinner { id, .. } if id == &handler.view));
+            (handler.view.clone(), spinner)
+        }).collect(),
         program
             .activity
             .on_create
@@ -1532,15 +2354,17 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             .map(|id| Ok((id.clone(), pool.field(class, &format!("view${id}"))?)))
             .collect::<Result<BTreeMap<_, _>, DexError>>()?,
         &program.activity.state,
+        &program.activity.string_collections,
         persistence_lowering,
         preferences,
         tables,
     )?;
-    let click = if program.activity.on_click.is_empty() {
+    let events = if program.activity.on_click.is_empty() && program.activity.on_select.is_empty() {
         None
     } else {
-        Some(crate::lower_on_click(
+        Some(crate::lower_events(
             &program.activity.on_click,
+            &program.activity.on_select,
             &resolve_target,
             &resolve_string,
             string_lowering,
@@ -1556,6 +2380,11 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 text_view_type: pool.type_index["Landroid/widget/TextView;"],
                 text_view_init: pool.method("Landroid/widget/TextView;", "<init>", &pc)?,
                 text_view_set_text: pool.method("Landroid/widget/TextView;", "setText", &ps)?,
+                text_view_set_text_size: pool.method(
+                    "Landroid/widget/TextView;",
+                    "setTextSize",
+                    &Proto { ret: "V", params: vec!["I", "F"] },
+                )?,
                 button_type: pool.type_index["Landroid/widget/Button;"],
                 button_init: pool.method("Landroid/widget/Button;", "<init>", &pc)?,
                 edit_text_type: pool.type_index["Landroid/widget/EditText;"],
@@ -1568,6 +2397,59 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 )?,
                 scroll_view_type: pool.type_index["Landroid/widget/ScrollView;"],
                 scroll_view_init: pool.method("Landroid/widget/ScrollView;", "<init>", &pc)?,
+                frame_layout_type: pool.type_index["Landroid/widget/FrameLayout;"],
+                frame_layout_init: pool.method("Landroid/widget/FrameLayout;", "<init>", &pc)?,
+                check_box_type: pool.type_index["Landroid/widget/CheckBox;"],
+                check_box_init: pool.method("Landroid/widget/CheckBox;", "<init>", &pc)?,
+                switch_type: pool.type_index["Landroid/widget/Switch;"],
+                switch_init: pool.method("Landroid/widget/Switch;", "<init>", &pc)?,
+                progress_bar_type: pool.type_index["Landroid/widget/ProgressBar;"],
+                progress_bar_init: pool.method("Landroid/widget/ProgressBar;", "<init>", &pc)?,
+                image_view_type: pool.type_index["Landroid/widget/ImageView;"],
+                image_view_init: pool.method("Landroid/widget/ImageView;", "<init>", &pc)?,
+                image_view_set_resource: pool.method(
+                    "Landroid/widget/ImageView;",
+                    "setImageResource",
+                    &pi,
+                )?,
+                toolbar_type: pool.type_index["Landroid/widget/Toolbar;"],
+                toolbar_init: pool.method("Landroid/widget/Toolbar;", "<init>", &pc)?,
+                toolbar_set_title: pool.method("Landroid/widget/Toolbar;", "setTitle", &ps)?,
+                list_view_type: pool.type_index["Landroid/widget/ListView;"],
+                list_view_init: pool.method("Landroid/widget/ListView;", "<init>", &pc)?,
+                spinner_type: pool.type_index["Landroid/widget/Spinner;"],
+                spinner_init: pool.method("Landroid/widget/Spinner;", "<init>", &pc)?,
+                string_array_type: pool.type_index["[Ljava/lang/String;"],
+                array_adapter_type: pool.type_index["Landroid/widget/ArrayAdapter;"],
+                array_adapter_init: pool.method(
+                    "Landroid/widget/ArrayAdapter;",
+                    "<init>",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Landroid/content/Context;", "I", "[Ljava/lang/Object;"],
+                    },
+                )?,
+                array_adapter_set_drop_down_view_resource: pool.method(
+                    "Landroid/widget/ArrayAdapter;",
+                    "setDropDownViewResource",
+                    &pi,
+                )?,
+                list_view_set_adapter: pool.method(
+                    "Landroid/widget/ListView;",
+                    "setAdapter",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Landroid/widget/ListAdapter;"],
+                    },
+                )?,
+                spinner_set_adapter: pool.method(
+                    "Landroid/widget/Spinner;",
+                    "setAdapter",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Landroid/widget/SpinnerAdapter;"],
+                    },
+                )?,
                 set_on_click_listener: pool.method(
                     "Landroid/view/View;",
                     "setOnClickListener",
@@ -1576,6 +2458,10 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                         params: vec!["Landroid/view/View$OnClickListener;"],
                     },
                 )?,
+                list_view_set_on_item_click_listener: pool.method("Landroid/widget/ListView;", "setOnItemClickListener", &Proto { ret: "V", params: vec!["Landroid/widget/AdapterView$OnItemClickListener;"] })?,
+                spinner_set_on_item_selected_listener: pool.method("Landroid/widget/Spinner;", "setOnItemSelectedListener", &Proto { ret: "V", params: vec!["Landroid/widget/AdapterView$OnItemSelectedListener;"] })?,
+                adapter_view_get_item_at_position: pool.method("Landroid/widget/AdapterView;", "getItemAtPosition", &Proto { ret: "Ljava/lang/Object;", params: vec!["I"] })?,
+                object_to_string: pool.method("Ljava/lang/Object;", "toString", &Proto { ret: "Ljava/lang/String;", params: vec![] })?,
                 layout_params_type: pool.type_index["Landroid/widget/LinearLayout$LayoutParams;"],
                 layout_params_init: pool.method(
                     "Landroid/widget/LinearLayout$LayoutParams;",
@@ -1583,6 +2469,14 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                     &Proto {
                         ret: "V",
                         params: vec!["I", "I", "F"],
+                    },
+                )?,
+                layout_params_set_margins: pool.method(
+                    "Landroid/view/ViewGroup$MarginLayoutParams;",
+                    "setMargins",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["I", "I", "I", "I"],
                     },
                 )?,
                 set_layout_params: pool.method(
@@ -1608,7 +2502,176 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                     &pi,
                 )?,
                 add_view: pool.method("Landroid/view/ViewGroup;", "addView", &pv)?,
+                set_fits_system_windows: pool.method(
+                    "Landroid/view/View;",
+                    "setFitsSystemWindows",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Z"],
+                    },
+                )?,
                 set_content_view: pool.method("Landroid/app/Activity;", "setContentView", &pv)?,
+                intent_type: pool.type_index["Landroid/content/Intent;"],
+                intent_init: pool.method("Landroid/content/Intent;", "<init>", &p0)?,
+                intent_set_class_name: pool.method(
+                    "Landroid/content/Intent;",
+                    "setClassName",
+                    &Proto {
+                        ret: "Landroid/content/Intent;",
+                        params: vec!["Landroid/content/Context;", "Ljava/lang/String;"],
+                    },
+                )?,
+                intent_put_i32: pool.method(
+                    "Landroid/content/Intent;",
+                    "putExtra",
+                    &Proto {
+                        ret: "Landroid/content/Intent;",
+                        params: vec!["Ljava/lang/String;", "I"],
+                    },
+                )?,
+                intent_put_bool: pool.method(
+                    "Landroid/content/Intent;",
+                    "putExtra",
+                    &Proto {
+                        ret: "Landroid/content/Intent;",
+                        params: vec!["Ljava/lang/String;", "Z"],
+                    },
+                )?,
+                intent_put_string: pool.method(
+                    "Landroid/content/Intent;",
+                    "putExtra",
+                    &Proto {
+                        ret: "Landroid/content/Intent;",
+                        params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                    },
+                )?,
+                start_activity: pool.method(
+                    "Landroid/app/Activity;",
+                    "startActivity",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Landroid/content/Intent;"],
+                    },
+                )?,
+                finish_activity: pool.method("Landroid/app/Activity;", "finish", &p0)?,
+                set_padding: pool.method(
+                    "Landroid/view/View;",
+                    "setPadding",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["I", "I", "I", "I"],
+                    },
+                )?,
+                set_visibility: pool.method("Landroid/view/View;", "setVisibility", &pi)?,
+                set_enabled: pool.method(
+                    "Landroid/view/View;",
+                    "setEnabled",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Z"],
+                    },
+                )?,
+                set_content_description: pool.method(
+                    "Landroid/view/View;",
+                    "setContentDescription",
+                    &ps,
+                )?,
+                set_important_for_accessibility: pool.method(
+                    "Landroid/view/View;",
+                    "setImportantForAccessibility",
+                    &pi,
+                )?,
+                context_get_resources: pool.method(
+                    "Landroid/content/Context;",
+                    "getResources",
+                    &Proto { ret: "Landroid/content/res/Resources;", params: vec![] },
+                )?,
+                resources_get_display_metrics: pool.method(
+                    "Landroid/content/res/Resources;",
+                    "getDisplayMetrics",
+                    &Proto { ret: "Landroid/util/DisplayMetrics;", params: vec![] },
+                )?,
+                display_metrics_density_dpi: pool.field(
+                    "Landroid/util/DisplayMetrics;",
+                    "densityDpi",
+                )?,
+                minimum_touch_target_field: pool.field(class, "platform$minimumTouchTarget")?,
+                set_minimum_width: pool.method("Landroid/view/View;", "setMinimumWidth", &pi)?,
+                set_minimum_height: pool.method("Landroid/view/View;", "setMinimumHeight", &pi)?,
+                generate_view_id: pool.method(
+                    "Landroid/view/View;",
+                    "generateViewId",
+                    &Proto { ret: "I", params: vec![] },
+                )?,
+                set_view_id: pool.method("Landroid/view/View;", "setId", &pi)?,
+                text_view_set_label_for: pool.method(
+                    "Landroid/widget/TextView;",
+                    "setLabelFor",
+                    &pi,
+                )?,
+                set_accessibility_heading: pool.method(
+                    "Landroid/view/View;",
+                    "setAccessibilityHeading",
+                    &Proto { ret: "V", params: vec!["Z"] },
+                )?,
+                sdk_int_field: pool.field("Landroid/os/Build$VERSION;", "SDK_INT").ok(),
+                set_text_alignment: pool.method("Landroid/view/View;", "setTextAlignment", &pi)?,
+                dialog_builder_type: pool.type_index["Landroid/app/AlertDialog$Builder;"],
+                dialog_builder_init: pool.method(
+                    "Landroid/app/AlertDialog$Builder;",
+                    "<init>",
+                    &pc,
+                )?,
+                dialog_set_title: pool.method(
+                    "Landroid/app/AlertDialog$Builder;",
+                    "setTitle",
+                    &Proto {
+                        ret: "Landroid/app/AlertDialog$Builder;",
+                        params: vec!["Ljava/lang/CharSequence;"],
+                    },
+                )?,
+                dialog_set_message: pool.method(
+                    "Landroid/app/AlertDialog$Builder;",
+                    "setMessage",
+                    &Proto {
+                        ret: "Landroid/app/AlertDialog$Builder;",
+                        params: vec!["Ljava/lang/CharSequence;"],
+                    },
+                )?,
+                dialog_show: pool.method(
+                    "Landroid/app/AlertDialog$Builder;",
+                    "show",
+                    &Proto {
+                        ret: "Landroid/app/AlertDialog;",
+                        params: vec![],
+                    },
+                )?,
+                popup_menu_type: pool.type_index["Landroid/widget/PopupMenu;"],
+                popup_menu_init: pool.method(
+                    "Landroid/widget/PopupMenu;",
+                    "<init>",
+                    &Proto {
+                        ret: "V",
+                        params: vec!["Landroid/content/Context;", "Landroid/view/View;"],
+                    },
+                )?,
+                popup_menu_get_menu: pool.method(
+                    "Landroid/widget/PopupMenu;",
+                    "getMenu",
+                    &Proto {
+                        ret: "Landroid/view/Menu;",
+                        params: vec![],
+                    },
+                )?,
+                menu_add: pool.method(
+                    "Landroid/view/Menu;",
+                    "add",
+                    &Proto {
+                        ret: "Landroid/view/MenuItem;",
+                        params: vec!["Ljava/lang/CharSequence;"],
+                    },
+                )?,
+                popup_menu_show: pool.method("Landroid/widget/PopupMenu;", "show", &p0)?,
             },
             program
                 .activity
@@ -1627,6 +2690,10 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 .iter()
                 .filter_map(|statement| view_id(statement).map(str::to_owned))
                 .map(|id| Ok((id.clone(), pool.field(class, &format!("view${id}"))?)))
+                .collect::<Result<BTreeMap<_, _>, DexError>>()?,
+            &program.activity.on_select.iter()
+                .filter(|handler| program.activity.on_create.iter().any(|statement| matches!(&statement.kind, StatementKind::Spinner { id, .. } if id == &handler.view)))
+                .map(|handler| Ok((handler.view.clone(), pool.field(class, &format!("selectionReady${}", handler.view))?)))
                 .collect::<Result<BTreeMap<_, _>, DexError>>()?,
             persistence_lowering,
             preferences,
@@ -1654,12 +2721,26 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             type_lists.push((proto.clone(), off));
         }
     }
-    let interfaces_off = if program.activity.on_click.is_empty() {
+    let mut interfaces = Vec::new();
+    if !program.activity.on_click.is_empty() {
+        interfaces.push("Landroid/view/View$OnClickListener;");
+    }
+    if events.as_ref().is_some_and(|e| e.list_select.is_some()) {
+        interfaces.push("Landroid/widget/AdapterView$OnItemClickListener;");
+    }
+    if events.as_ref().is_some_and(|e| e.spinner_select.is_some()) {
+        interfaces.push("Landroid/widget/AdapterView$OnItemSelectedListener;");
+    }
+    interfaces.sort_by_key(|descriptor| pool.type_index[*descriptor]);
+    let interfaces_off = if interfaces.is_empty() {
         0
     } else {
         cursor = align4(cursor)?;
         let offset = cursor;
-        cursor += 8;
+        cursor += 4 + u32_len(interfaces.len())? * 2;
+        if interfaces.len() % 2 != 0 {
+            cursor += 2;
+        }
         offset
     };
     let string_data = cursor;
@@ -1677,14 +2758,40 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
     cursor = align4(cursor)?;
     let create_code = cursor;
     cursor += 16 + u32_len(create.code.len())? * 2;
-    let click_code = if let Some(method) = &click {
-        cursor = align4(cursor)?;
-        let offset = cursor;
-        cursor += 16 + u32_len(method.code.len())? * 2;
-        Some(offset)
-    } else {
-        None
+    let selection_proto = Proto {
+        ret: "V",
+        params: vec![
+            "Landroid/widget/AdapterView;",
+            "Landroid/view/View;",
+            "I",
+            "J",
+        ],
     };
+    let parent_proto = Proto {
+        ret: "V",
+        params: vec!["Landroid/widget/AdapterView;"],
+    };
+    let mut event_methods: Vec<(&str, Proto, &crate::LoweredMethod)> = Vec::new();
+    if let Some(e) = &events {
+        if let Some(m) = &e.click {
+            event_methods.push(("onClick", pv.clone(), m));
+        }
+        if let Some(m) = &e.list_select {
+            event_methods.push(("onItemClick", selection_proto.clone(), m));
+        }
+        if let Some(m) = &e.spinner_select {
+            event_methods.push(("onItemSelected", selection_proto, m));
+        }
+        if let Some(m) = &e.nothing_selected {
+            event_methods.push(("onNothingSelected", parent_proto, m));
+        }
+    }
+    let mut event_code_offsets = Vec::new();
+    for (_, _, method) in &event_methods {
+        cursor = align4(cursor)?;
+        event_code_offsets.push(cursor);
+        cursor += 16 + u32_len(method.code.len())? * 2;
+    }
     let mut function_code_offsets = Vec::new();
     for method in &lowered {
         cursor = align4(cursor)?;
@@ -1693,14 +2800,22 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
     }
     let class_data = cursor;
     let class_data_bytes = class_data_item(
-        &(0..pool.fields.len())
-            .map(|index| u16::try_from(index).unwrap())
+        &pool
+            .fields
+            .iter()
+            .enumerate()
+            .filter(|(_, field)| field.class == class)
+            .map(|(index, _)| u16::try_from(index).unwrap())
             .collect::<Vec<_>>(),
         own_init,
         ctor_code,
         own_create,
         create_code,
-        click_code.map(|offset| (pool.method(class, "onClick", &pv).unwrap(), offset)),
+        &event_methods
+            .iter()
+            .zip(&event_code_offsets)
+            .map(|((name, proto, _), offset)| (pool.method(class, name, proto).unwrap(), *offset))
+            .collect::<Vec<_>>(),
         &functions
             .iter()
             .zip(&function_code_offsets)
@@ -1785,9 +2900,13 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
     if interfaces_off != 0 {
         out.align(4)?;
         debug_assert_eq!(u32_len(out.position())?, interfaces_off);
-        out.write_u32(1);
-        out.write_u16(pool.type_index["Landroid/view/View$OnClickListener;"]);
-        out.write_u16(0);
+        out.write_u32(u32_len(interfaces.len())?);
+        for interface in &interfaces {
+            out.write_u16(pool.type_index[*interface]);
+        }
+        if interfaces.len() % 2 != 0 {
+            out.write_u16(0);
+        }
     }
     for (value, expected) in pool.strings.iter().zip(&string_offsets) {
         debug_assert_eq!(u32_len(out.position())?, *expected);
@@ -1804,9 +2923,9 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
         create.outs,
         &create.code,
     );
-    if let (Some(method), Some(expected)) = (&click, click_code) {
+    for ((_, _, method), expected) in event_methods.iter().zip(&event_code_offsets) {
         out.align(4)?;
-        debug_assert_eq!(u32_len(out.position())?, expected);
+        debug_assert_eq!(u32_len(out.position())?, *expected);
         write_code(
             &mut out,
             method.registers,
@@ -1876,7 +2995,7 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
         },
         Section {
             kind: 0x2001,
-            count: 2 + u32_len(lowered.len())? + u32::from(click.is_some()),
+            count: 2 + u32_len(lowered.len())? + u32_len(event_methods.len())?,
             offset: ctor_code,
         },
         Section {
@@ -1911,7 +3030,7 @@ fn class_data_item(
     init_code: u32,
     create: u16,
     create_code: u32,
-    click: Option<(u16, u32)>,
+    events: &[(u16, u32)],
     functions: &[(u16, u32)],
 ) -> Vec<u8> {
     let mut direct = vec![(init, 0x1_0001, init_code)];
@@ -1925,7 +3044,7 @@ fn class_data_item(
     v.extend(encode_uleb128(0));
     v.extend(encode_uleb128(u32::try_from(fields.len()).unwrap()));
     v.extend(encode_uleb128(u32::try_from(direct.len()).unwrap()));
-    v.extend(encode_uleb128(1 + u32::from(click.is_some())));
+    v.extend(encode_uleb128(1 + u32::try_from(events.len()).unwrap()));
     let mut previous_field = 0_u16;
     for field in fields {
         v.extend(encode_uleb128(u32::from(*field - previous_field)));
@@ -1940,9 +3059,7 @@ fn class_data_item(
         previous = index;
     }
     let mut virtuals = vec![(create, 0x4, create_code)];
-    if let Some(entry) = click {
-        virtuals.push((entry.0, 0x1, entry.1));
-    }
+    virtuals.extend(events.iter().map(|entry| (entry.0, 0x1, entry.1)));
     virtuals.sort_by_key(|entry| entry.0);
     let mut previous_virtual = 0_u16;
     for (method, flags, code) in virtuals {

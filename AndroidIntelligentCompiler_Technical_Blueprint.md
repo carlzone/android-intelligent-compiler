@@ -357,8 +357,8 @@ Goal: install and launch an APK generated without Java/Kotlin source or Gradle f
 
 - Publish a machine-readable capability catalog shared by compiler validation, host UX, AI planning, documentation, and evaluation.
 - Version and migrate the IR before broadening it beyond the 0.1 linear-layout subset.
-- Add typed layout composition, alignment/gravity, spacing, visibility/state, adaptive dimensions, lists, images, dialogs, menus, and common controls.
-- Add multiple screens, explicit navigation/back/finish operations, lifecycle-safe restoration, resources, themes, localization, and accessibility semantics.
+- Add typed layout composition, alignment/gravity, spacing, visibility/state, adaptive dimensions, lists, images, dialogs, menus, and common controls. Implemented tranches bound dimensions and margins, reject invalid containment graphs, provide explicit common-input modes plus a bounded platform Spinner, and validate/lower literal text and background colors through the closed `ui.color` capability.
+- Add multiple screens, explicit navigation/back/finish operations, lifecycle-safe restoration, resources, themes, localization, and accessibility semantics. IR 0.2 now requires informative images and progress controls to have content descriptions, requires decorative images to be explicit, and restricts enabled state to interactive controls.
 - Require parser/schema, verifier, lowering, invalid fixtures, device tests, and compatibility evidence for every operation.
 > Milestone M9: AIC supports a declared production UI/navigation corpus across the supported device matrix.
 
@@ -370,7 +370,21 @@ Goal: install and launch an APK generated without Java/Kotlin source or Gradle f
 - Compiler-enforced privacy, exported-component, cleartext-network, data-retention, and least-capability policies.
 > Milestone M10: AIC supports a declared connected-application corpus with permission, privacy, lifecycle, offline, and recovery evidence.
 
-## Phase 11 - Specialized Local AI with Soup
+## Phase 11 - AI-Native Modular Development and AIC Studio
+
+The detailed architecture and AI coding rules are maintained in `compiler/docs/m11-ai-native-modular-studio.md` and `compiler/docs/aic-ai-authoring-standard-0.3.md`.
+
+- Introduce AIC IR 0.3 and `.aicproject` format 3 with a root manifest plus canonical screen, component, domain, service, resource, and image-asset modules.
+- Deterministically migrate IR 0.2/project format 2 only after presenting the result for user approval; continue reading project formats 1-2.
+- Add explicit imports/exports, composition-oriented components with typed parameters/events and private state, bounded service contracts, and compiler-verified standard components.
+- Generate a compact semantic project index and retrieve only the modules, interfaces, resources, and capability entries relevant to each AI task.
+- Replace complete-project responses with atomic file- and symbol-level patches protected by project/module hashes and all-or-nothing validation.
+- Provide Guided, Assisted, and Autonomous workflows selected by measured model reliability; recommend page-by-page work for models that do not reliably handle project scope.
+- Redesign the host as the core AIC Studio workspace with flexible project creation, a project tree, per-module source editing, contextual AI, application-plan review, per-file diffs, and consolidated diagnostics/build state on phone and tablet layouts.
+- Defer synchronized visual editing, editable navigation graphs, device previews, and component galleries until after the core modular workspace.
+> Milestone M11: lower- and higher-capability model workflows produce the same modular reference application through reviewable bounded changes and pass identical deterministic compiler, accessibility, compatibility, and device gates.
+
+## Phase 12 - Specialized Local AI with Soup
 
 - Add explicit supported/unsupported planning and capability IDs to the provider-neutral model contract.
 - Prefer compiler-owned semantic edit operations over unconstrained complete-source rewriting.
@@ -378,15 +392,15 @@ Goal: install and launch an APK generated without Java/Kotlin source or Gradle f
 - Use a pinned Soup release for reproducible QLoRA/SFT experiments on a selected Qwen instruct model.
 - Compare base, retrieval, constrained-decoding, and fine-tuned systems on held-out schema, compile, behavior, minimal-diff, repair, and refusal metrics.
 - Merge and export the accepted model as quantized GGUF for local llama.cpp/Ollama serving while retaining deterministic compiler authority.
-> Milestone M11: the specialized local model passes the held-out AIC suite and representative prompt-to-APK scenarios, including honest unsupported responses.
+> Milestone M12: the specialized local model passes the held-out AIC suite and representative prompt-to-APK scenarios, including honest unsupported responses.
 
-## Phase 12 - Production Hardening, Backends, and Ecosystem
+## Phase 13 - Production Hardening, Backends, and Ecosystem
 
 - Optional LLVM/ARM64 backend only for measured compute-heavy hotspots.
 - AAB/release pipeline after the APK compiler and expanded application profile are stable.
 - Reusable trusted primitive catalog, governed capability modules, IR compatibility, reproducible builds, and supply-chain metadata.
 - Publishing/distribution review, hardened signing/key management, fuzzing, security, accessibility, performance, power, upgrade, and reliability gates.
-> Milestone M12: AIC supports a governed production-grade subset with reproducible, optimized, distribution-ready builds.
+> Milestone M13: AIC supports a governed production-grade subset with reproducible, optimized, distribution-ready builds.
 
 # 11. Detailed First Three Milestones for Codex
 

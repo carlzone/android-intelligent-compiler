@@ -1,0 +1,11 @@
+aic_version 0.2
+app "Fixed collection" package "dev.aic.fixedcollection" {
+  activity MainActivity {
+    state items: string[] = ["One"]
+    on_create {
+      items = "replacement"
+      let list = android.list_view(items: items)
+      android.set_content_view(list)
+    }
+  }
+}

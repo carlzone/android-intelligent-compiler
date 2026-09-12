@@ -56,9 +56,23 @@ pub enum Instruction {
         dst: Register,
         ty: u16,
     },
+    NewArray {
+        dst: Register,
+        size: Register,
+        ty: u16,
+    },
+    AputObject {
+        value: Register,
+        array: Register,
+        index: Register,
+    },
     IGet {
         dst: Register,
         object: Register,
+        field: u16,
+    },
+    SGet {
+        dst: Register,
         field: u16,
     },
     IPut {
@@ -303,6 +317,18 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
             Instruction::NewInstance { dst, ty } => {
                 output.extend([0x22 | u16::from(reference(*dst)?) << 8, *ty])
             }
+            Instruction::NewArray { dst, size, ty } => output.extend([
+                0x23 | u16::from(reference(*dst)?) << 8 | u16::from(integer(*size)?) << 12,
+                *ty,
+            ]),
+            Instruction::AputObject {
+                value,
+                array,
+                index,
+            } => output.extend([
+                0x4d | u16::from(reference(*value)?) << 8,
+                u16::from(reference(*array)?) | u16::from(integer(*index)?) << 8,
+            ]),
             Instruction::IGet { dst, object, field }
             | Instruction::IPut {
                 src: dst,
@@ -311,8 +337,10 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
             } => {
                 let opcode = match (instruction, dst.kind) {
                     (Instruction::IGet { .. }, ValueKind::Reference) => 0x54,
+                    (Instruction::IGet { .. }, ValueKind::Bool) => 0x55,
                     (Instruction::IGet { .. }, _) => 0x52,
                     (Instruction::IPut { .. }, ValueKind::Reference) => 0x5b,
+                    (Instruction::IPut { .. }, ValueKind::Bool) => 0x5c,
                     (Instruction::IPut { .. }, _) => 0x59,
                     _ => unreachable!(),
                 };
@@ -323,6 +351,17 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
                     opcode | u16::from(dst.index) << 8 | u16::from(object.index) << 12,
                     *field,
                 ]);
+            }
+            Instruction::SGet { dst, field } => {
+                if dst.kind == ValueKind::Reference {
+                    return Err(DexError::InvalidInput("invalid static field register"));
+                }
+                let opcode = if dst.kind == ValueKind::Bool {
+                    0x63
+                } else {
+                    0x60
+                };
+                output.extend([opcode | u16::from(dst.index) << 8, *field]);
             }
             Instruction::AddInt { dst, left, right }
             | Instruction::SubInt { dst, left, right }
@@ -417,7 +456,7 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
                     ));
                 }
                 let mut registers = 0_u16;
-                for (slot, arg) in args.iter().enumerate() {
+                for (slot, arg) in args.iter().take(4).enumerate() {
                     if arg.index > 15 {
                         return Err(DexError::InvalidInput("M2 register index exceeds 15"));
                     }
@@ -431,7 +470,9 @@ pub fn assemble(instructions: &[Instruction]) -> Result<Vec<u16>, DexError> {
                     _ => 0x71,
                 };
                 output.extend([
-                    opcode | u16::try_from(args.len()).unwrap() << 12,
+                    opcode
+                        | u16::from(args.get(4).map_or(0, |arg| arg.index)) << 8
+                        | u16::try_from(args.len()).unwrap() << 12,
                     *method,
                     registers,
                 ]);
@@ -566,5 +607,78 @@ mod tests {
     #[test]
     fn rejects_scalar_in_object_instruction() {
         assert!(assemble(&[Instruction::ReturnObject { value: r(0) }]).is_err());
+    }
+    #[test]
+    fn encodes_boolean_instance_fields_with_typed_opcodes() {
+        let value = Register {
+            index: 1,
+            kind: ValueKind::Bool,
+        };
+        let object = Register {
+            index: 2,
+            kind: ValueKind::Reference,
+        };
+        assert_eq!(
+            assemble(&[
+                Instruction::IGet {
+                    dst: value,
+                    object,
+                    field: 7
+                },
+                Instruction::IPut {
+                    src: value,
+                    object,
+                    field: 7
+                },
+            ])
+            .unwrap(),
+            vec![0x2155, 7, 0x215c, 7]
+        );
+    }
+    #[test]
+    fn encodes_static_sdk_field_and_rejects_reference_destination() {
+        assert_eq!(
+            assemble(&[Instruction::SGet {
+                dst: r(3),
+                field: 11,
+            }])
+            .unwrap(),
+            vec![0x0360, 11]
+        );
+        assert!(assemble(&[Instruction::SGet {
+            dst: Register {
+                index: 0,
+                kind: ValueKind::Reference,
+            },
+            field: 11,
+        }])
+        .is_err());
+    }
+    #[test]
+    fn encodes_object_array_creation_and_store() {
+        let array = Register {
+            index: 1,
+            kind: ValueKind::Reference,
+        };
+        let value = Register {
+            index: 2,
+            kind: ValueKind::Reference,
+        };
+        assert_eq!(
+            assemble(&[
+                Instruction::NewArray {
+                    dst: array,
+                    size: r(3),
+                    ty: 9
+                },
+                Instruction::AputObject {
+                    value,
+                    array,
+                    index: r(4)
+                },
+            ])
+            .unwrap(),
+            vec![0x3123, 9, 0x024d, 0x0401]
+        );
     }
 }

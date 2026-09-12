@@ -1,0 +1,10 @@
+aic_version 0.2
+app "Invalid margin" package "dev.aic.invalidmargin" {
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      android.set_layout(view: root, width: match_parent, height: 48, weight: 0, margin_left: -1, margin_top: 0, margin_right: 0, margin_bottom: 0)
+      android.set_content_view(root)
+    }
+  }
+}

@@ -1,0 +1,11 @@
+aic_version 0.2
+app "Duplicate selection" package "dev.aic.duplicateselection" {
+  activity MainActivity {
+    on_create {
+      let list = android.list_view(items: ["One"])
+      android.set_content_view(list)
+    }
+    on_select(list, first_index, first_value) {}
+    on_select(list, second_index, second_value) {}
+  }
+}

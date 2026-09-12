@@ -12,7 +12,7 @@
     "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
     "touched_areas": {
       "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true,
-      "items": { "enum": ["metadata", "state", "functions", "capabilities", "persistence", "ui", "events"] }
+      "items": { "enum": ["metadata", "state", "functions", "capabilities", "persistence", "ui", "events", "navigation", "resources", "accessibility", "lifecycle"] }
     }
   }
 }

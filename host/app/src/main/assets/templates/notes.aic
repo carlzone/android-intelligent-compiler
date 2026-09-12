@@ -1,4 +1,4 @@
-aic_version 0.1
+aic_version 0.2
 app "AIC Notes" package "dev.aic.generated.notes" {
   capability persistence.key_value
   capability persistence.sqlite

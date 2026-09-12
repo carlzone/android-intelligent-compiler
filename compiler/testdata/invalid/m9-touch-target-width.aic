@@ -1,0 +1,1 @@
+aic_version 0.2 app "Small touch width" package "dev.aic.smalltouchwidth" { activity MainActivity { on_create { let action = android.button(text: "Action") android.set_layout(view: action, width: 47, height: wrap_content, weight: 0) android.set_content_view(action) } on_click(action) { android.finish() } } }

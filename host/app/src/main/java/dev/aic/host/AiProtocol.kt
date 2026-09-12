@@ -22,7 +22,7 @@ fun interface ModelProvider { fun generate(turn: ModelTurn): ModelAnswer }
 
 object AiProtocol {
     const val SCHEMA_VERSION="aic.model-proposal/1"
-    val AREAS=setOf("metadata","state","functions","capabilities","persistence","ui","events")
+    val AREAS=setOf("metadata","state","functions","capabilities","persistence","ui","events","navigation","resources","accessibility","lifecycle")
 
     fun parse(answer: ModelAnswer, expected: AiOperation): AiProposal {
         require(answer.rawProposal.toByteArray().size <= ProjectCodec.MAX_SOURCE + 4096) { "AIC7002 schema: Model response is too large" }
@@ -34,7 +34,7 @@ object AiProtocol {
         require(value.getString("operation")==expected.wire) { "AIC7002 schema: Operation does not match the request" }
         val source=value.getString("source")
         require(source.isNotBlank() && source.toByteArray().size <= ProjectCodec.MAX_SOURCE) { "AIC7002 schema: Invalid source size" }
-        require(source.trimStart().startsWith("aic_version 0.1")) { "AIC7002 schema: source must be a complete AIC program beginning with `aic_version 0.1`" }
+        require(source.trimStart().startsWith("aic_version 0.2")) { "AIC7002 schema: source must be a complete AIC program beginning with `aic_version 0.2`" }
         val summary=value.getString("summary")
         require(summary.isNotBlank() && summary.length<=500) { "AIC7002 schema: Invalid summary" }
         val array=value.getJSONArray("touched_areas")

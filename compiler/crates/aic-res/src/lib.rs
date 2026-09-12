@@ -61,6 +61,48 @@ pub struct Manifest {
 impl Manifest {
     #[must_use]
     pub fn new(package: &str, label: &str, activity: &str) -> Self {
+        Self::new_multi(package, label, &[activity.to_owned()])
+    }
+    #[must_use]
+    pub fn new_multi(package: &str, label: &str, activities: &[String]) -> Self {
+        let activity_nodes = activities
+            .iter()
+            .enumerate()
+            .map(|(index, activity)| {
+                element(
+                    "activity",
+                    vec![
+                        attr("name", &format!(".{activity}"), 3, 0),
+                        attr(
+                            "exported",
+                            if index == 0 { "true" } else { "false" },
+                            0x12,
+                            NONE,
+                        ),
+                    ],
+                    if index == 0 {
+                        vec![element(
+                            "intent-filter",
+                            vec![],
+                            vec![
+                                element(
+                                    "action",
+                                    vec![attr("name", "android.intent.action.MAIN", 3, 0)],
+                                    vec![],
+                                ),
+                                element(
+                                    "category",
+                                    vec![attr("name", "android.intent.category.LAUNCHER", 3, 0)],
+                                    vec![],
+                                ),
+                            ],
+                        )]
+                    } else {
+                        vec![]
+                    },
+                )
+            })
+            .collect();
         Self {
             root: element(
                 "manifest",
@@ -85,34 +127,7 @@ impl Manifest {
                                 THEME,
                             ),
                         ],
-                        vec![element(
-                            "activity",
-                            vec![
-                                attr("name", &format!(".{activity}"), 3, 0),
-                                attr("exported", "true", 0x12, NONE),
-                            ],
-                            vec![element(
-                                "intent-filter",
-                                vec![],
-                                vec![
-                                    element(
-                                        "action",
-                                        vec![attr("name", "android.intent.action.MAIN", 3, 0)],
-                                        vec![],
-                                    ),
-                                    element(
-                                        "category",
-                                        vec![attr(
-                                            "name",
-                                            "android.intent.category.LAUNCHER",
-                                            3,
-                                            0,
-                                        )],
-                                        vec![],
-                                    ),
-                                ],
-                            )],
-                        )],
+                        activity_nodes,
                     ),
                 ],
             ),

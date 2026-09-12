@@ -1,4 +1,4 @@
-aic_version 0.1
+aic_version 0.2
 app "AIC Hello" package "dev.aic.generated.hello" {
   activity MainActivity {
     on_create {

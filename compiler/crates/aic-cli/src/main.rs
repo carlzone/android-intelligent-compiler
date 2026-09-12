@@ -1,6 +1,6 @@
 use aic_build::{compile_source, inject_stored_zip};
 use aic_dex::encode_minimal_dex;
-use aic_ir::MinimalClass;
+use aic_ir::{migrate_source, MinimalClass};
 use aic_opt::{CompilerOptions, OptimizationLevel};
 use std::{
     env,
@@ -25,9 +25,21 @@ fn run() -> Result<(), Box<dyn Error>> {
     match args.first().and_then(|v| v.to_str()) {
         Some("emit-minimal") if args.len() == 1 => emit_minimal(),
         Some("compile") => compile(&args[1..]),
+        Some("migrate") => migrate(&args[1..]),
         Some("assemble-apk") => assemble(&args[1..]),
-        _ => Err("usage: aic-cli emit-minimal | compile --input <file> --output-dir <dir> --profile android-35 [--opt-level 0|1] | assemble-apk --base <apk> --dex <dex> --output <apk>".into()),
+        _ => Err("usage: aic-cli emit-minimal | compile --input <file> --output-dir <dir> --profile android-35 [--opt-level 0|1] | migrate --input <file> --output <file> --to 0.2 | assemble-apk --base <apk> --dex <dex> --output <apk>".into()),
     }
+}
+fn migrate(args: &[OsString]) -> Result<(), Box<dyn Error>> {
+    let input = option(args, "--input")?;
+    let output = option(args, "--output")?;
+    if option(args, "--to")? != Path::new("0.2") {
+        return Err("unsupported migration target; expected 0.2".into());
+    }
+    let migrated = migrate_source(&fs::read_to_string(input)?)?;
+    write_file(&output, migrated.as_bytes())?;
+    println!("migrated {}", output.display());
+    Ok(())
 }
 fn emit_minimal() -> Result<(), Box<dyn Error>> {
     let output =
@@ -63,6 +75,9 @@ fn compile(args: &[OsString]) -> Result<(), Box<dyn Error>> {
     )?;
     write_file(&output.join("unsigned.apk"), &artifacts.unsigned_apk)?;
     write_file(&output.join("classes.dex"), &artifacts.dex)?;
+    for (name, bytes) in &artifacts.dex_files {
+        write_file(&output.join(name), bytes)?;
+    }
     write_file(
         &output.join("AndroidManifest.xml"),
         artifacts.manifest.as_bytes(),

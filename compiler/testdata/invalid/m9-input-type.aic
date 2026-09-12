@@ -1,0 +1,11 @@
+aic_version 0.2
+app "Invalid input" package "dev.aic.invalidinput" {
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let input = android.text_input(hint: "Value", input_type: decimal)
+      android.add_view(parent: root, child: input)
+      android.set_content_view(root)
+    }
+  }
+}

@@ -1,0 +1,1 @@
+aic_version 0.2 app "Bad heading" package "dev.aic.badheading" { activity MainActivity { on_create { let root = android.linear_layout(orientation: vertical) let image = android.image_view(icon: info) android.set_decorative(view: image) android.set_heading(view: image) android.add_view(parent: root, child: image) android.set_content_view(root) } } }

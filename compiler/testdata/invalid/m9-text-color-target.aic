@@ -1,0 +1,1 @@
+aic_version 0.2 app "Bad text color target" package "dev.aic.badtextcolor" { activity MainActivity { on_create { let root = android.linear_layout(orientation: vertical) android.set_text_color(view: root, color: "#010203") android.set_content_view(root) } } }

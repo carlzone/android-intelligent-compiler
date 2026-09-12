@@ -44,7 +44,8 @@ object ModelProviderFactory {
 private class PromptAssets(private val context: Context) {
     val schema: JSONObject get()=JSONObject(context.assets.open("ai/proposal-schema.json").bufferedReader().use { it.readText() }).apply { remove("\$schema"); remove("\$id") }
     fun input(turn: ModelTurn): String=buildString {
-        append(context.assets.open("ai/aic-ir-0.1.md").bufferedReader().use { it.readText() })
+        append(context.assets.open("ai/aic-ir-0.2.md").bufferedReader().use { it.readText() })
+        append("\nCapability catalog:\n").append(context.assets.open("ai/capabilities-0.2.json").bufferedReader().use { it.readText() })
         val words=turn.prompt.lowercase()
         if(turn.operation==AiOperation.CREATE) {
             val reference=when {
@@ -93,9 +94,9 @@ The final program must contain the same existing view declarations exactly once.
         }
         turn.diagnostics?.let { append("\nLOCAL VALIDATOR FEEDBACK AND REJECTED OUTPUT FROM THE PREVIOUS ATTEMPT:\n").append(it).append("\nRepair the complete AIC source.\n") }
         append("\nFINAL TASK\nOperation: ").append(turn.operation.wire).append("\nUser intent: ").append(turn.prompt)
-            .append("\nThe `source` JSON field must contain the entire compilable AIC program, beginning with `aic_version 0.1`. For patch operations it must contain the requested actual source change; never return the original unchanged program. Do not summarize it or return a filename.\n")
+            .append("\nThe `source` JSON field must contain the entire compilable AIC program, beginning with `aic_version 0.2`. For patch operations it must contain the requested actual source change; never return the original unchanged program. Do not summarize it or return a filename.\n")
     }
-    val system="Translate Android app intent into the closed AIC IR 0.1 language. Output only the required JSON object. Never emit binaries, keys, signing data, commands, Java, or Kotlin."
+    val system="Translate Android app intent into the closed AIC IR 0.2 language. Output only the required JSON object. Never emit binaries, keys, signing data, commands, Java, or Kotlin."
 }
 
 private fun postJson(url: String, headers: Map<String,String>, body: JSONObject): JSONObject {

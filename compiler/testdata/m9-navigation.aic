@@ -1,0 +1,119 @@
+aic_version 0.2
+app "AIC Navigation" package "dev.aic.navigation" {
+  activity MainActivity {
+    state destinations: string[] = ["Overview", "Details", "Settings"]
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let toolbar = android.toolbar(title: "AIC Navigation")
+      let title = android.text_view(text: "Home")
+      let next = android.button(text: "Open details")
+      let card = android.frame_layout()
+      android.set_layout(view: card, width: match_parent, height: 96, weight: 0, margin_left: 8, margin_top: 12, margin_right: 8, margin_bottom: 12)
+      let icon = android.image_view(icon: info)
+      let loading = android.progress_bar()
+      let remember = android.check_box(text: "Remember choice")
+      let updates = android.switch(text: "Enable updates")
+      let destination_list = android.list_view(items: destinations)
+      android.set_layout(view: toolbar, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: next, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: remember, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: updates, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: destination_list, width: match_parent, height: 144, weight: 0)
+      android.set_text_size(view: title, size_sp: 24)
+      android.set_heading(view: title)
+      android.set_text_size(view: next, size_sp: 18)
+      android.set_text_size(view: remember, size_sp: 16)
+      android.set_text_size(view: updates, size_sp: 16)
+      android.set_text_color(view: title, color: "#202124")
+      android.set_background_color(view: root, color: "#E8F0FE")
+      android.set_padding(view: root, left: 16, top: 16, right: 16, bottom: 16)
+      android.set_gravity(view: title, gravity: center)
+      android.set_content_description(view: next, text: "Open the detail screen")
+      android.set_decorative(view: icon)
+      android.set_content_description(view: loading, text: "Loading details")
+      android.set_enabled(view: next, enabled: true)
+      android.set_visibility(view: next, visibility: visible)
+      android.add_view(parent: root, child: toolbar)
+      android.add_view(parent: root, child: title)
+      android.add_view(parent: root, child: next)
+      android.add_view(parent: card, child: icon)
+      android.add_view(parent: card, child: loading)
+      android.add_view(parent: root, child: card)
+      android.add_view(parent: root, child: remember)
+      android.add_view(parent: root, child: updates)
+      android.add_view(parent: root, child: destination_list)
+      android.set_content_view(root)
+    }
+    on_click(next) {
+      android.show_menu(anchor: toolbar, item: "Details")
+      android.show_dialog(title: "Opening", message: "Opening the details screen")
+      android.start_activity(DetailActivity, extras: item_id: 7, editable: true, title: "Details")
+    }
+    on_select(destination_list, index, value) {
+      android.set_text(view: title, text: value)
+    }
+  }
+  activity DetailActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let title = android.text_view(text: "Details")
+      let close = android.button(text: "Close")
+      let inputs = android.button(text: "Open inputs")
+      let flourish = android.image_view(icon: info)
+      let unavailable = android.button(text: "Unavailable")
+      android.set_layout(view: close, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: inputs, width: match_parent, height: 48, weight: 0)
+      android.set_heading(view: title)
+      android.set_content_description(view: flourish, text: "Information")
+      android.set_enabled(view: unavailable, enabled: false)
+      android.set_visibility(view: unavailable, visibility: gone)
+      android.add_view(parent: root, child: title)
+      android.add_view(parent: root, child: close)
+      android.add_view(parent: root, child: inputs)
+      android.add_view(parent: root, child: flourish)
+      android.add_view(parent: root, child: unavailable)
+      android.set_content_view(root)
+    }
+    on_click(close) {
+      android.finish()
+    }
+    on_click(inputs) {
+      android.start_activity(InputActivity)
+    }
+  }
+  activity InputActivity {
+    state choices: string[] = ["First", "Second", "Third"]
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let plain_label = android.text_view(text: "Text")
+      let plain = android.text_input(hint: "Text", input_type: text)
+      let email = android.text_input(hint: "Email", input_type: email)
+      let password = android.text_input(hint: "Password", input_type: password)
+      let phone = android.text_input(hint: "Phone", input_type: phone)
+      let integer = android.text_input(hint: "Integer", input_type: integer)
+      let choice = android.spinner(items: choices)
+      let selected = android.text_view(text: "No selection")
+      android.set_layout(view: plain, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: email, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: password, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: phone, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: integer, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: choice, width: match_parent, height: 48, weight: 0)
+      android.set_text_size(view: plain, size_sp: 18)
+      android.set_text_size(view: selected, size_sp: 20)
+      android.set_input_label(label: plain_label, input: plain)
+      android.add_view(parent: root, child: plain_label)
+      android.add_view(parent: root, child: plain)
+      android.add_view(parent: root, child: email)
+      android.add_view(parent: root, child: password)
+      android.add_view(parent: root, child: phone)
+      android.add_view(parent: root, child: integer)
+      android.add_view(parent: root, child: choice)
+      android.add_view(parent: root, child: selected)
+      android.set_content_view(root)
+    }
+    on_select(choice, index, value) {
+      android.set_text(view: selected, text: value)
+    }
+  }
+}

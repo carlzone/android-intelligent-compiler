@@ -1,0 +1,11 @@
+aic_version 0.2
+app "Empty spinner" package "dev.aic.emptyspinner" {
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let choice = android.spinner(items: [])
+      android.add_view(parent: root, child: choice)
+      android.set_content_view(root)
+    }
+  }
+}

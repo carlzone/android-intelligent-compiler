@@ -1,0 +1,38 @@
+(* AIC IR 0.2. The Rust parser, verifier, and capability catalog are authoritative. *)
+program       = "aic_version", "0.2", "app", string, "package", string, "{", { app-member }, activity, { activity }, "}" ;
+app-member    = capability | preference | database | function ;
+activity      = "activity", identifier, "{", { state | string-collection }, on-create, { on-click }, { on-select }, "}" ;
+state         = "state", identifier, ":", type, "=", literal ;
+string-collection = "state", identifier, ":", "string", "[", "]", "=", "[", string,
+                    { ",", string }, "]" ; (* 1..100 fixed items *)
+on-create     = "on_create", block ;
+on-click      = "on_click", "(", identifier, ")", block ;
+on-select     = "on_select", "(", identifier, ",", identifier, ",", identifier, ")", block ;
+navigation    = "android.start_activity", "(", identifier, [ ",", "extras", ":", named-values ], ")" | "android.finish", "(", ")" ;
+view-property = "android.set_padding" | "android.set_visibility" | "android.set_enabled" |
+                "android.set_content_description" | "android.set_decorative" | "android.set_gravity" | text-size |
+                text-color | background-color | input-label | heading ;
+text-size     = "android.set_text_size", "(", "view", ":", identifier, ",",
+                "size_sp", ":", integer, ")" ; (* integer is bounded to 1..200 SP *)
+text-color    = "android.set_text_color", "(", "view", ":", identifier, ",",
+                "color", ":", color, ")" ; (* TextView subclasses only in IR 0.2 *)
+background-color = "android.set_background_color", "(", "view", ":", identifier, ",",
+                   "color", ":", color, ")" ;
+color         = string ; (* parser restricts literals to #RRGGBB or #AARRGGBB *)
+input-label   = "android.set_input_label", "(", "label", ":", identifier, ",",
+                "input", ":", identifier, ")" ;
+heading       = "android.set_heading", "(", "view", ":", identifier, ")" ;
+input-type    = "text" | "email" | "password" | "phone" | "integer" ;
+text-input    = "android.text_input", "(", "hint", ":", expression,
+                [ ",", "input_type", ":", input-type ], ")" ;
+spinner       = "android.spinner", "(", "items", ":", collection-items, ")" ;
+collection-items = identifier | "[", expression, { ",", expression }, "]" ; (* 1..100 strings *)
+layout-size   = "match_parent" | "wrap_content" | integer ; (* integer is bounded to 0..4096 dp *)
+layout        = "android.set_layout", "(", "view", ":", identifier, ",", "width", ":", layout-size,
+                ",", "height", ":", layout-size, ",", "weight", ":", ( "0" | "1" ),
+                [ ",", "margin_left", ":", integer, ",", "margin_top", ":", integer,
+                  ",", "margin_right", ":", integer, ",", "margin_bottom", ":", integer ], ")" ;
+type          = "i32" | "bool" | "string" ;
+
+(* IR 0.1 declarations and expressions remain source-compatible. The complete
+   closed vocabulary is published by capabilities-0.2.json and parser tests. *)

@@ -23,12 +23,16 @@ impl Error for BuildError {}
 #[derive(Debug, PartialEq, Eq)]
 pub struct BuildArtifacts {
     pub dex: Vec<u8>,
+    pub dex_files: Vec<(String, Vec<u8>)>,
     pub manifest: String,
     pub binary_manifest: Vec<u8>,
     pub unsigned_apk: Vec<u8>,
     pub build_profile: String,
     pub package: String,
     pub activity: String,
+    pub activities: Vec<String>,
+    pub ir_version: String,
+    pub catalog_version: &'static str,
 }
 
 /// Compile validated AIC source without filesystem or Android host dependencies.
@@ -45,12 +49,27 @@ pub fn compile_source(
         location: e.location,
     })?;
     let (program, optimization) = optimize_with_report(parsed, options);
-    let dex = aic_dex::encode_activity_dex(&program).map_err(|e| BuildError {
-        stage: "lower",
-        code: "AIC6006",
-        message: e.to_string(),
-        location: None,
-    })?;
+    let mut dex_files = Vec::new();
+    for (index, activity) in program.activities.iter().enumerate() {
+        let mut unit = program.clone();
+        unit.activity = activity.clone();
+        unit.activities = vec![activity.clone()];
+        let bytes = aic_dex::encode_activity_dex(&unit).map_err(|e| BuildError {
+            stage: "lower",
+            code: "AIC6006",
+            message: e.to_string(),
+            location: None,
+        })?;
+        dex_files.push((
+            if index == 0 {
+                "classes.dex".into()
+            } else {
+                format!("classes{}.dex", index + 1)
+            },
+            bytes,
+        ));
+    }
+    let dex = dex_files[0].1.clone();
     let build_profile = format!(
         "profile=android-35\ndex=035\nminSdk=23\ntargetSdk=35\noptLevel={}\ncapabilities={}\npermissions=\nfunctions.before={}\nfunctions.after={}\nfunctions.removed={}\nresources.before={}\nresources.after={}\nresources.removed={}\n",
         i32::from(options.optimization_level != OptimizationLevel::None),
@@ -58,27 +77,37 @@ pub fn compile_source(
         optimization.functions_before, optimization.functions_after, optimization.removed_functions(),
         optimization.preferences_before + optimization.tables_before,
         optimization.preferences_after + optimization.tables_after, optimization.removed_resources());
-    let manifest = aic_res::Manifest::new(&program.package, &program.label, &program.activity.name);
+    let activity_names: Vec<_> = program.activities.iter().map(|a| a.name.clone()).collect();
+    let manifest = aic_res::Manifest::new_multi(&program.package, &program.label, &activity_names);
     let binary_manifest = manifest.binary().map_err(|e| BuildError {
         stage: "package",
         code: "AIC8001",
         message: e.to_string(),
         location: None,
     })?;
-    let unsigned_apk = assemble_apk(&binary_manifest, &dex).map_err(|e| BuildError {
-        stage: "package",
-        code: "AIC8002",
-        message: e.to_string(),
-        location: None,
-    })?;
+    let unsigned_apk =
+        assemble_apk_files(&binary_manifest, &dex_files).map_err(|e| BuildError {
+            stage: "package",
+            code: "AIC8002",
+            message: e.to_string(),
+            location: None,
+        })?;
     Ok(BuildArtifacts {
         dex,
+        dex_files,
         manifest: manifest.text(),
         binary_manifest,
         unsigned_apk,
         build_profile,
         package: program.package.clone(),
         activity: format!("{}.{}", program.package, program.activity.name),
+        activities: program
+            .activities
+            .iter()
+            .map(|a| format!("{}.{}", program.package, a.name))
+            .collect(),
+        ir_version: program.version.clone(),
+        catalog_version: "aic.capabilities/0.2",
     })
 }
 
@@ -86,10 +115,24 @@ pub fn compile_source(
 /// # Errors
 /// Returns a ZIP format-limit error if an artifact is oversized.
 pub fn assemble_apk(manifest: &[u8], dex: &[u8]) -> Result<Vec<u8>, ZipError> {
+    assemble_apk_files(manifest, &[("classes.dex".into(), dex.to_vec())])
+}
+
+/// Assemble a deterministic APK containing one or more DEX units.
+///
+/// # Errors
+/// Returns a checked ZIP-format error for invalid names, duplicates, or size limits.
+pub fn assemble_apk_files(
+    manifest: &[u8],
+    dex_files: &[(String, Vec<u8>)],
+) -> Result<Vec<u8>, ZipError> {
     let mut empty = vec![0x50, 0x4b, 0x05, 0x06];
     empty.resize(22, 0);
-    let base = inject_stored_zip(&empty, "AndroidManifest.xml", manifest)?;
-    inject_stored_zip(&base, "classes.dex", dex)
+    let mut apk = inject_stored_zip(&empty, "AndroidManifest.xml", manifest)?;
+    for (name, bytes) in dex_files {
+        apk = inject_stored_zip(&apk, name, bytes)?;
+    }
+    Ok(apk)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -254,6 +297,28 @@ mod tests {
         let e = compile_source("not a program", CompilerOptions::default()).unwrap_err();
         assert!(e.location.is_some());
         assert!(e.code.starts_with("AIC"));
+    }
+    #[test]
+    fn m9_packages_multiple_verified_activities_deterministically() {
+        let source = include_str!("../../../testdata/m9-navigation.aic");
+        let result = compile_source(source, CompilerOptions::default()).unwrap();
+        assert_eq!(result.ir_version, "0.2");
+        assert_eq!(result.activities.len(), 3);
+        assert_eq!(
+            result
+                .dex_files
+                .iter()
+                .map(|x| x.0.as_str())
+                .collect::<Vec<_>>(),
+            vec!["classes.dex", "classes2.dex", "classes3.dex"]
+        );
+        assert!(result.manifest.contains(".MainActivity"));
+        assert!(result.manifest.contains(".DetailActivity"));
+        assert!(result.manifest.contains(".InputActivity"));
+        assert_eq!(
+            result,
+            compile_source(source, CompilerOptions::default()).unwrap()
+        );
     }
     #[test]
     fn zip_alignment_and_bad_input() {

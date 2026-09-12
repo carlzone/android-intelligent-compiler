@@ -1,0 +1,1 @@
+aic_version 0.2 app "Small touch height" package "dev.aic.smalltouchheight" { activity MainActivity { on_create { let input = android.text_input(hint: "Name", input_type: text) android.set_layout(view: input, width: match_parent, height: 47, weight: 0) android.set_content_view(input) } } }
