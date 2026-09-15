@@ -1,0 +1,9 @@
+aic_version 0.2
+app "Invalid icon" package "dev.aic.invalidicon" {
+  activity MainActivity {
+    on_create {
+      let image = android.image_view(icon: help)
+      android.set_content_view(image)
+    }
+  }
+}

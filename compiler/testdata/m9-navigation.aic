@@ -55,7 +55,8 @@ app "AIC Navigation" package "dev.aic.navigation" {
   }
   activity DetailActivity {
     on_create {
-      let root = android.linear_layout(orientation: vertical)
+      let root = android.scroll_view()
+      let content = android.linear_layout(orientation: vertical)
       let title = android.text_view(text: "Details")
       let close = android.button(text: "Close")
       let inputs = android.button(text: "Open inputs")
@@ -67,11 +68,12 @@ app "AIC Navigation" package "dev.aic.navigation" {
       android.set_content_description(view: flourish, text: "Information")
       android.set_enabled(view: unavailable, enabled: false)
       android.set_visibility(view: unavailable, visibility: gone)
-      android.add_view(parent: root, child: title)
-      android.add_view(parent: root, child: close)
-      android.add_view(parent: root, child: inputs)
-      android.add_view(parent: root, child: flourish)
-      android.add_view(parent: root, child: unavailable)
+      android.add_view(parent: content, child: title)
+      android.add_view(parent: content, child: close)
+      android.add_view(parent: content, child: inputs)
+      android.add_view(parent: content, child: flourish)
+      android.add_view(parent: content, child: unavailable)
+      android.add_view(parent: root, child: content)
       android.set_content_view(root)
     }
     on_click(close) {

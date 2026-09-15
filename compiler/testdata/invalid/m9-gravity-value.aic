@@ -1,0 +1,10 @@
+aic_version 0.2
+app "Invalid gravity" package "dev.aic.invalidgravity" {
+  activity MainActivity {
+    on_create {
+      let text = android.text_view(text: "Text")
+      android.set_gravity(view: text, gravity: middle)
+      android.set_content_view(text)
+    }
+  }
+}

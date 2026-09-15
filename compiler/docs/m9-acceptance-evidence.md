@@ -2,19 +2,71 @@
 
 Status: implementation in progress; exit gate open.
 
+New threads should read `m9-current-handoff.md` first for the concise worktree,
+verification, device, and resume snapshot.
+
 ## Phase evidence ledger
 
 | Phase | Implementation evidence | Acceptance evidence | Status |
 | --- | --- | --- | --- |
 | M9.1 IR/migration/catalog | Parser/verifier migration tests, CLI migration, compiler/host catalog parity | Full 0.1 behavior and APK reproducibility corpus remains part of final run | Implemented; final rerun pending |
 | M9.2 screens/navigation/state | Multi-Activity DEX/manifest tests and start/finish fixture; typed Intent extras parser/verifier/lowering | Results, Bundle restoration, and device lifecycle evidence missing | Active / partial |
-| M9.3 UI/widgets/accessibility | Focused verifier/lowering tests and `m9-navigation.aic` cover system-window fitting, bounded dimensions/margins, containment, common input modes, fixed string collections, typed ListView/Spinner selection events, bounded SP text sizing, literal text/background colors, explicit labels/headings, touch targets, strict informative/decorative image and progress semantics, and visibility/enabled validation | API 36 ARM64 collection/selection, default/enlarged-font text sizing, TalkBack label/heading, touch-target, and strict accessibility-semantics scenarios passed at O0/O1; color and broader supported-device coverage remain | Partial |
+| M9.3 UI/widgets/accessibility | The complete declared surface is mapped to grammar, verifier, optimizer, lowering, invalid-input, and runnable evidence; `m9-navigation.aic` also covers valid single-child ScrollView composition | API 36 ARM64 physical-phone checks pass at O0/O1; API 35 x86_64 tablet at 2560x1600/320dpi and compact 720x1280/240dpi automated checks pass at O0/O1; manual TalkBack on non-hardware API profiles was explicitly waived | Complete with documented emulator-accessibility limitation |
 | M9.4 resources/localization/assets | Project format 2 codec and asset-validation tests | Resource table/package, locale, image build, and AAPT2 evidence missing | Partial |
 | M9.5 adaptive/lifecycle corpus | None yet for the complete declared behavior | Rotation, process death, locale, font, TalkBack, density, and size matrix missing | Not started |
 | M9.6 host/AI/diagnostics/reference apps | IR 0.2 contract/templates, initial fixture, ADR, and build script | Final response schema and three-app corpus missing | Partial |
 | M9.7 acceptance/closure | Local tests have passed during implemented tranches | Full fingerprinted desktop/device run and M8 matrix closure missing | Blocked |
 
-Current M9.3 resume point: **remaining widget/property families and the broader accessibility/device matrix**. Literal colors are implemented with the `ui.color` catalog entry, `AIC1014` format validation, IR 0.2 `AIC1442` text-target validation, direct framework lowering, invalid fixtures, deterministic O0/O1 local coverage, and completed API 36 ARM64 O0/O1 device evidence. Strict IR 0.2 image/progress semantics and visibility/enabled validation retain `AIC1435`–`AIC1441`, compiler/host catalog parity, deterministic coverage, and their completed API 36 ARM64 O0/O1 manual scenario. M9.2 typed results and Bundle restoration remain open dependencies for milestone closure. Every future handoff must update this ledger and the detailed checklist in `m9-production-ui-navigation.md`.
+M9.3 is complete as of 2026-09-15. The representative matrix is the API 36 ARM64 480dpi physical phone plus API 35 x86_64 tablet and compact emulator profiles. The user explicitly waived manual TalkBack confirmation on non-hardware API profiles; API 35 retains automated accessibility-node/service evidence, while the complete manual TalkBack scenario passed on API 36 hardware. Exhaustive API 23-36 generated-app and API 30-36 native ARM64 compatibility remains an M8/M9.7 gate. The current milestone resume point is M9.4 canonical resources and deterministic APK resource packaging.
+
+## Representative API 35 matrix evidence — 2026-09-14
+
+The installed `system-images;android-35;google_apis_playstore_tablet;x86_64` image was configured as AVD `AIC_M9_API35_Tablet`. It ran natively as x86_64; its advertised ARM64 translation support is not counted as native ARM64 evidence. The same AVD supplied two non-duplicative layout profiles: its native 2560x1600, 320dpi tablet configuration and a temporary 720x1280, 240dpi compact configuration. Display, density, rotation, font-scale, and accessibility-service settings were restored after collection.
+
+The complete four-row automated matrix was repeated successfully on 2026-09-15 using the running AVD. After the tablet O0/O1 and compact O0/O1 results, all overrides were restored, the emulator was stopped, and `AIC_M9_API35_Tablet` was deleted to release its writable AVD storage. The API 35 system image and ignored evidence artifacts were retained.
+
+At both O0 and O1, each profile passed cold launch; widget presence; CheckBox and Switch toggling; collection selection; Details navigation and platform `ScrollView`; hidden-control exclusion; informative-image semantics; all declared input fields; text entry and password-node behavior; Spinner setup/selection; orientation recreation; background/resume; 1.3 font scaling; density-derived minimum touch heights; installed-APK hash parity; and a clean Android crash buffer. Large-font screenshots were inspected for the intended pale-blue background, dark heading text, readable controls, and absence of overlap. The tablet controls measured at least 96px at 320dpi and compact controls at least 72px at 240dpi, both exactly representing the 48dp floor.
+
+- Emulator serial/model: `emulator-5554`, `Pixel Tablet`
+- Android/API/ABI: Android 15, API 35, `x86_64` (`arm64-v8a` translation advertised but not counted)
+- Fingerprint: `google/sdk_gtablet_x86_64/emu64xa:15/AE3A.240806.046.T1/13135149:user/dev-keys`
+- Native tablet profile: 2560x1600, 320dpi, portrait/landscape exercised, O0/O1 passed
+- Compact override profile: 720x1280, 240dpi, portrait/landscape exercised, O0/O1 passed
+- O0/O1 signed and installed APK SHA-256: `C90F37FAAD8FB476466D853C71D03BB060880979E75D8CA57B9A767BC12827B0`
+- Executable hashes: `classes.dex` `CB3996F129EB8D0B49D250DB30837BDF657BE1C86314862774DB1438D8F3291E`; `classes2.dex` `94952AC4CC38362690E5A80C3609887D8AC04655C41A45E6DC36CEC776978637`; `classes3.dex` `0BA7E04B1E81B11F931B867219714D4EBE6895F8FEDC369EB7AFA1CC242F3FC6`; unsigned APK `C68480C1C18DDCB5F4809AB85EC41C79675EA37C6B30590CE773838B560F0625`
+
+TalkBack package `com.google.android.marvin.talkback` was installed and its service was successfully enabled on API 35. Automated hierarchy evidence confirms the informative image description, decorative-image omission, progress description, hidden-control exclusion, and functional traversal targets. Headless automation cannot truthfully establish spoken announcements or subjective touch-exploration quality. On 2026-09-15 the user explicitly waived those manual checks on non-hardware API profiles; the limitation is retained in this evidence rather than represented as a manual pass.
+
+### Refreshed API 36 physical-device pass — 2026-09-15
+
+The user completed the full supplied checklist on the physical API 36 ARM64 phone after the representative-matrix O1 artifact was installed and cold-launched. Every reported item passed: basic rendering and colors; edge/corner activation; collection selection with exactly-once heading updates; popup menu, dialog, Details `ScrollView`, close/back navigation, and hidden-control exclusion; all five input modes and password masking; Spinner setup suppression and explicit selection; rotation on every Activity; background/resume; enlarged-font layout and restoration; TalkBack headings, descriptions, decorative-image omission, label association, traversal, touch exploration, and double-tap activation; normal touch after disabling TalkBack; and final force-close/cold-launch stability without a crash or ANR.
+
+- Device serial/model/ABI: `e56c4a46`, `2312DRA50G`, `arm64-v8a`
+- Android/API: Android 16, API 36
+- Fingerprint: `Redmi/garnet_global/garnet:16/BP2A.250605.031.A3/OS3.0.4.0.WNRMIXM:user/release-keys`
+- Installed optimization artifact: O1 (byte-identical to O0)
+- Signed and ADB-pulled installed APK SHA-256: `C90F37FAAD8FB476466D853C71D03BB060880979E75D8CA57B9A767BC12827B0`
+
+This refreshes and fully passes the physical-phone row for the current representative-matrix artifact. Together with the passing API 35 automated rows and the explicit non-hardware TalkBack waiver, it closes M9.3.
+
+## Declared UI family audit — 2026-09-13
+
+The item 1 audit passed workspace tests, strict Clippy, host JVM tests and lint, the complete offline M8 prerequisite build, compiler/host catalog parity, focused parser/verifier/optimizer tests, and aggregate direct DEX inspection. The IR 0.2 EBNF now enumerates the complete supported widget/property syntax. Focused valid and invalid cases cover bounded padding, start/center/end alignment, visible/invisible/gone visibility, info/warning/delete icons, inline collections, containment, and the existing accessibility constraints. The runnable fixture's Details screen now uses a platform `ScrollView` with exactly one linear-layout child while preserving its existing controls and navigation.
+
+Two compilations at both O0 and O1 were deterministic. All four runs produced identical executable artifacts: `classes.dex` SHA-256 `CB3996F129EB8D0B49D250DB30837BDF657BE1C86314862774DB1438D8F3291E`, `classes2.dex` `94952AC4CC38362690E5A80C3609887D8AC04655C41A45E6DC36CEC776978637`, `classes3.dex` `0BA7E04B1E81B11F931B867219714D4EBE6895F8FEDC369EB7AFA1CC242F3FC6`, and unsigned APK `C68480C1C18DDCB5F4809AB85EC41C79675EA37C6B30590CE773838B560F0625`. O0 and O1 build-profile metadata differs only as expected for the selected optimization level. The source base was `6f15fd41174ed72e18b6c308d316eecd42cf9cdf` plus this M9.3 audit worktree, using `rustc 1.98.1 (48a229cea 2026-09-01)` and `cargo 1.98.1 (797e8a9bc 2026-08-05)`. This closed implementation item 1; the completed representative device evidence is recorded above and below.
+
+### Declared UI family audit O0/O1 device evidence — 2026-09-14
+
+The user completed the supplied O0 and O1 checklist and reported every scenario OK on the connected physical device. Coverage included cold launch; Home widgets and typed selection behavior; popup menu and alert dialog; Details navigation and the new vertical `ScrollView` composition; reachability and activation of Details controls after scrolling; all common input modes, password masking, and Spinner setup suppression/selection; back-stack behavior; rotation and background/resume; enlarged-font layout; TalkBack headings, labels, informative/decorative image handling, progress description, and hidden-control exclusion; and final cold-launch stability.
+
+- Device serial/model/ABI: `e56c4a46`, `2312DRA50G`, `arm64-v8a`
+- Android/API: Android 16, API 36
+- Build fingerprint: `Redmi/garnet_global/garnet:16/BP2A.250605.031.A3/OS3.0.4.0.WNRMIXM:user/release-keys`
+- O0 signed APK SHA-256: `10B169EB01D8B300210D03F74EE8A2BC379B787EAD2736C1DF902A8B8FE6CE9B`
+- O1 signed APK SHA-256: `10B169EB01D8B300210D03F74EE8A2BC379B787EAD2736C1DF902A8B8FE6CE9B`
+- Installed base APK SHA-256 confirmed through ADB: `10B169EB01D8B300210D03F74EE8A2BC379B787EAD2736C1DF902A8B8FE6CE9B`
+
+The identical O0/O1 signed hashes are expected because the supported optimizer makes no byte-changing transformation to this verified fixture. This completes the single-device regression evidence for item 1; it does not close item 2's wider TalkBack, density, screen-size, or supported-device matrix.
 
 The literal-color tranche passed workspace tests, strict Clippy, host JVM tests and lint, the complete offline M8 prerequisite build, compiler/host catalog parity, focused parser/verifier/optimizer/DEX coverage, and two deterministic compilations at both O0 and O1 on 2026-09-12. The runnable fixture uses dark `#202124` heading text on a deliberately visible but soft `#E8F0FE` MainActivity background. All four builds were byte-identical: `classes.dex` SHA-256 `CB3996F129EB8D0B49D250DB30837BDF657BE1C86314862774DB1438D8F3291E`, `classes2.dex` `CDC817AB2BDB1C4E862BB1C3EAADFA93EF83A67359FEB3AE2F289E9F8A37F488`, `classes3.dex` `0BA7E04B1E81B11F931B867219714D4EBE6895F8FEDC369EB7AFA1CC242F3FC6`, unsigned APK `C00ADB06EE0DF49C92F0FF3DD2E3865D3E694B1E3B104C01E2441B2A56846F8C`, and signed APK `20E53E97200D74163A1173436E8C16EE5BD957D440828E8E969466EA5A88E7CD`. The O0 and O1 signed APKs passed v1/v2 signature verification for the API 23–36 range. The source base was `0bd9e0531a01f34e97691d1c79303a1f8ef264a4` plus the recorded uncommitted M9 worktree, using `rustc 1.98.1 (48a229cea 2026-09-01)` and `cargo 1.98.1 (797e8a9bc 2026-08-05)`.
 
@@ -81,7 +133,7 @@ The user completed the collection/selection checklist at both O0 and O1 on the c
 - O0 APK SHA-256: `10499603C82F513E9E5F5437D3E090CACD82C68A5AE833688C429E5A9618AD29`
 - O1 APK SHA-256: `10499603C82F513E9E5F5437D3E090CACD82C68A5AE833688C429E5A9618AD29`
 
-The identical O0/O1 hashes are expected for this fixture because the supported optimizer makes no byte-changing transformation to these verified activities. This closes the device scenario for the collection/selection tranche, not the wider M9.3 accessibility matrix or the final M9.7 clean-source matrix.
+The identical O0/O1 hashes are expected for this fixture because the supported optimizer makes no byte-changing transformation to these verified activities. This closes the collection/selection tranche; final clean-source compatibility remains part of M9.7.
 
 ### Bounded scale-safe text sizing device evidence — 2026-09-12
 

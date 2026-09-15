@@ -1,0 +1,10 @@
+aic_version 0.2
+app "Invalid padding" package "dev.aic.invalidpadding" {
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      android.set_padding(view: root, left: 0, top: 0, right: 4097, bottom: 0)
+      android.set_content_view(root)
+    }
+  }
+}

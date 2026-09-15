@@ -1,0 +1,10 @@
+aic_version 0.2
+app "Invalid visibility" package "dev.aic.invalidvisibility" {
+  activity MainActivity {
+    on_create {
+      let text = android.text_view(text: "Text")
+      android.set_visibility(view: text, visibility: hidden)
+      android.set_content_view(text)
+    }
+  }
+}

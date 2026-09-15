@@ -16,9 +16,9 @@ The reference fixture is `compiler/testdata/m9-navigation.aic`. Build it with th
 normal `aic-cli compile` path. Unsupported M9 catalog entries remain explicitly
 `planned`; they must not be presented as supported by the host or AI layer.
 
-M9 is not complete. Result passing, Bundle restoration, the remaining widget
-groups, compiled resources/localization, adaptive variants, full accessibility
-evidence, and the device matrix are still open.
+M9 is not complete. Result passing, Bundle restoration, compiled
+resources/localization, adaptive variants, full accessibility evidence, and the
+device matrix are still open.
 
 ## Execution phases and handoff checkpoint
 
@@ -46,7 +46,7 @@ Next work, in order:
 
 Completion gate: navigation arguments/results and every declared screen-state type survive the documented lifecycle scenarios with source-located failures for invalid use.
 
-### M9.3 — Production layout, widgets, and reusable UI — Partial
+### M9.3 — Production layout, widgets, and reusable UI — Implemented
 
 Implemented: linear/scroll/frame composition, system-window fitting for generated content roots, core sizing/weight behavior, padding, visibility, enabled state, alignment, text/button input, explicit text/email/password/phone/integer input modes, checkbox, switch, progress, built-in images, toolbar, popup menu, alert dialog, bounded platform spinners, and bounded literal string lists backed by platform reusable rows.
 
@@ -60,10 +60,11 @@ Strict IR 0.2 accessibility semantics are implemented for non-text views and vie
 
 Literal color properties are complete for IR 0.2. `android.set_text_color` accepts `#RRGGBB` or `#AARRGGBB` literals only for platform TextView subclasses; invalid targets fail with `AIC1442`. `android.set_background_color` accepts every declared view. Both lower through direct platform `Color.parseColor`, `TextView.setTextColor`, and `View.setBackgroundColor` calls, and `ui.color` is advertised only after parser, verifier, optimizer, DEX, fixture, and catalog-parity coverage. IR 0.1 compatibility is unchanged.
 
-Remaining work, in order:
+Completed work:
 
-1. Add parser/schema coverage, verifier diagnostics, lowering, capability entries, invalid fixtures, deterministic O0/O1 tests, and runnable examples for every remaining widget/property family.
-2. Extend the completed API 36 ARM64 single-device checks across the remaining TalkBack, density, screen-size, and supported-device matrix.
+- Parser/schema coverage, verifier diagnostics, lowering, capability entries, invalid fixtures, deterministic O0/O1 tests, and runnable examples for every declared widget/property family. The declared surface is inventoried in `../schema/m9-ui-capability-evidence.tsv`; a catalog-parity regression test requires all seven evidence fields for every supported `ui.*` and `accessibility.*` capability. The runnable fixture includes valid single-child `ScrollView` composition, focused tests cover bounded padding, gravity, visibility, built-in icon, and inline-collection variants, and the complete regression checklist passed at O0/O1 on the API 36 ARM64 device.
+
+The representative API 36 physical and API 35 tablet/compact matrix is complete. The user explicitly waived manual TalkBack checks on non-hardware API profiles; automated API 35 accessibility evidence and the complete API 36 hardware TalkBack pass remain recorded in the acceptance ledger.
 
 Completion gate: every declared widget/property family has parser, verifier, lowering, invalid fixtures, capability entries, and runnable examples.
 
@@ -97,8 +98,8 @@ M9 cannot close until M9.1–M9.6 pass and the pre-existing M8 compatibility mat
 
 ## Resume instruction for a new work session
 
-Read this document, `m9-acceptance-evidence.md`, the IR 0.2 capability catalog, and the current worktree before editing. Preserve all existing uncommitted M9 changes and keep planned catalog entries unsupported until parser, verifier, lowering, fixtures, and tests exist.
+Read `m9-current-handoff.md` first, then this document, `m9-acceptance-evidence.md`, the IR 0.2 capability catalog, and the current worktree before editing. Preserve all existing uncommitted M9 changes and keep planned catalog entries unsupported until parser, verifier, lowering, fixtures, and tests exist.
 
-Resume M9.3 with **the remaining widget/property families and broader accessibility/device evidence**. Literal text/background colors now have schema, verifier, optimizer, direct DEX lowering, catalog, invalid-fixture, runnable-example, deterministic O0/O1 local coverage, and passing API 36 ARM64 O0/O1 device evidence. Strict informative/decorative image and progress semantics plus visibility/enabled target and conflict validation retain their completed local and API 36 ARM64 O0/O1 evidence. Explicit labels, headings, touch targets, scale-safe text sizing, collections, and selection events retain their recorded device coverage. The broader accessibility and supported-device matrix remains open.
+Resume M9.4 with **the canonical resource model and deterministic resource-package foundation**. M9.3 is complete: API 36 ARM64/480dpi physical-phone evidence and API 35 x86_64 tablet/compact O0/O1 automation pass; manual TalkBack on non-hardware API profiles was explicitly waived and remains documented as a limitation. Keep localization, resource images, and project-asset capability entries planned until their complete implementation evidence exists. Exhaustive API compatibility remains the separate M8/M9.7 gate.
 
-After collections/events, continue through the numbered M9.3 list above. M9.2 typed results and Bundle restoration remain open and must still be completed before M9 closure.
+M9.2 typed results and Bundle restoration remain open and must still be completed before M9 closure.

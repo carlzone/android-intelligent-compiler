@@ -9,9 +9,39 @@ on-create     = "on_create", block ;
 on-click      = "on_click", "(", identifier, ")", block ;
 on-select     = "on_select", "(", identifier, ",", identifier, ",", identifier, ")", block ;
 navigation    = "android.start_activity", "(", identifier, [ ",", "extras", ":", named-values ], ")" | "android.finish", "(", ")" ;
-view-property = "android.set_padding" | "android.set_visibility" | "android.set_enabled" |
-                "android.set_content_description" | "android.set_decorative" | "android.set_gravity" | text-size |
-                text-color | background-color | input-label | heading ;
+view-constructor = linear-layout | scroll-view | frame-layout | text-view | button | edit-text |
+                   text-input | check-box | switch | progress-bar | image-view | toolbar |
+                   list-view | spinner ;
+linear-layout = "android.linear_layout", "(", "orientation", ":", orientation, ")" ;
+scroll-view   = "android.scroll_view", "(", ")" ;
+frame-layout  = "android.frame_layout", "(", ")" ;
+text-view     = "android.text_view", "(", "text", ":", expression, ")" ;
+button        = "android.button", "(", "text", ":", expression, ")" ;
+edit-text     = "android.edit_text", "(", "hint", ":", expression, ")" ;
+check-box     = "android.check_box", "(", "text", ":", expression, ")" ;
+switch        = "android.switch", "(", "text", ":", expression, ")" ;
+progress-bar  = "android.progress_bar", "(", ")" ;
+image-view    = "android.image_view", "(", "icon", ":", builtin-icon, ")" ;
+toolbar       = "android.toolbar", "(", "title", ":", expression, ")" ;
+list-view     = "android.list_view", "(", "items", ":", collection-items, ")" ;
+view-property = layout | set-padding | set-visibility | set-enabled | set-content-description |
+                set-decorative | set-gravity | text-size | text-color | background-color |
+                input-label | heading ;
+view-tree     = "android.add_view", "(", "parent", ":", identifier, ",", "child", ":", identifier, ")" |
+                "android.set_content_view", "(", identifier, ")" ;
+set-text      = "android.set_text", "(", "view", ":", identifier, ",", "text", ":", expression, ")" ;
+set-padding   = "android.set_padding", "(", "view", ":", identifier,
+                ",", "left", ":", bounded-dp, ",", "top", ":", bounded-dp,
+                ",", "right", ":", bounded-dp, ",", "bottom", ":", bounded-dp, ")" ;
+set-visibility = "android.set_visibility", "(", "view", ":", identifier,
+                 ",", "visibility", ":", visibility, ")" ;
+set-enabled   = "android.set_enabled", "(", "view", ":", identifier,
+                ",", "enabled", ":", expression, ")" ;
+set-content-description = "android.set_content_description", "(", "view", ":", identifier,
+                          ",", "text", ":", expression, ")" ;
+set-decorative = "android.set_decorative", "(", "view", ":", identifier, ")" ;
+set-gravity   = "android.set_gravity", "(", "view", ":", identifier,
+                ",", "gravity", ":", gravity, ")" ;
 text-size     = "android.set_text_size", "(", "view", ":", identifier, ",",
                 "size_sp", ":", integer, ")" ; (* integer is bounded to 1..200 SP *)
 text-color    = "android.set_text_color", "(", "view", ":", identifier, ",",
@@ -22,16 +52,23 @@ color         = string ; (* parser restricts literals to #RRGGBB or #AARRGGBB *)
 input-label   = "android.set_input_label", "(", "label", ":", identifier, ",",
                 "input", ":", identifier, ")" ;
 heading       = "android.set_heading", "(", "view", ":", identifier, ")" ;
+show-menu     = "android.show_menu", "(", "anchor", ":", identifier, ",", "item", ":", expression, ")" ;
+show-dialog   = "android.show_dialog", "(", "title", ":", expression, ",", "message", ":", expression, ")" ;
 input-type    = "text" | "email" | "password" | "phone" | "integer" ;
 text-input    = "android.text_input", "(", "hint", ":", expression,
                 [ ",", "input_type", ":", input-type ], ")" ;
 spinner       = "android.spinner", "(", "items", ":", collection-items, ")" ;
 collection-items = identifier | "[", expression, { ",", expression }, "]" ; (* 1..100 strings *)
-layout-size   = "match_parent" | "wrap_content" | integer ; (* integer is bounded to 0..4096 dp *)
+orientation   = "vertical" | "horizontal" ;
+visibility    = "visible" | "invisible" | "gone" ;
+gravity       = "start" | "center" | "end" ;
+builtin-icon  = "info" | "warning" | "delete" ;
+bounded-dp    = integer ; (* bounded to 0..4096 dp *)
+layout-size   = "match_parent" | "wrap_content" | bounded-dp ;
 layout        = "android.set_layout", "(", "view", ":", identifier, ",", "width", ":", layout-size,
                 ",", "height", ":", layout-size, ",", "weight", ":", ( "0" | "1" ),
-                [ ",", "margin_left", ":", integer, ",", "margin_top", ":", integer,
-                  ",", "margin_right", ":", integer, ",", "margin_bottom", ":", integer ], ")" ;
+                [ ",", "margin_left", ":", bounded-dp, ",", "margin_top", ":", bounded-dp,
+                  ",", "margin_right", ":", bounded-dp, ",", "margin_bottom", ":", bounded-dp ], ")" ;
 type          = "i32" | "bool" | "string" ;
 
 (* IR 0.1 declarations and expressions remain source-compatible. The complete

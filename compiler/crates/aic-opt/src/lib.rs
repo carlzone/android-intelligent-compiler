@@ -656,6 +656,40 @@ mod tests {
     }
 
     #[test]
+    fn m9_declared_ui_surface_survives_o0_and_o1() {
+        let program = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+        for options in [
+            CompilerOptions {
+                optimization_level: OptimizationLevel::None,
+            },
+            CompilerOptions::default(),
+        ] {
+            let optimized = optimize(program.clone(), options);
+            assert_eq!(optimized.activities.len(), 3);
+            assert!(optimized
+                .activities
+                .iter()
+                .flat_map(|activity| &activity.on_create)
+                .any(|statement| matches!(statement.kind, StatementKind::ScrollView { .. })));
+            assert!(optimized
+                .activities
+                .iter()
+                .flat_map(|activity| &activity.on_create)
+                .any(|statement| matches!(statement.kind, StatementKind::FrameLayout { .. })));
+            assert!(optimized
+                .activities
+                .iter()
+                .flat_map(|activity| &activity.on_create)
+                .any(|statement| matches!(statement.kind, StatementKind::ListView { .. })));
+            assert!(optimized
+                .activities
+                .iter()
+                .flat_map(|activity| &activity.on_create)
+                .any(|statement| matches!(statement.kind, StatementKind::Spinner { .. })));
+        }
+    }
+
+    #[test]
     fn folds_away_and_prunes_dead_persistence_resources() {
         let source = "aic_version 0.1 app \"x\" package \"dev.aic.x\" { capability persistence.key_value preference legacy: bool = false activity MainActivity { on_create { let root = android.linear_layout(orientation: vertical) if 1 + 1 == 3 { preference.set(legacy, true) } android.set_content_view(root) } } }";
         let p = parse_program(source).unwrap();

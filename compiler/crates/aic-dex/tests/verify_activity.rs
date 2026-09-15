@@ -519,3 +519,57 @@ fn m9_emits_accessibility_semantics_deterministically() {
         assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
     }
 }
+
+#[test]
+fn m9_emits_declared_ui_surface_deterministically() {
+    let parsed = parse_program(include_str!("../../../testdata/m9-navigation.aic")).unwrap();
+    for options in [
+        CompilerOptions {
+            optimization_level: aic_opt::OptimizationLevel::None,
+        },
+        CompilerOptions::default(),
+    ] {
+        let optimized = optimize(parsed.clone(), options);
+        let dexes = optimized
+            .activities
+            .iter()
+            .map(|activity| {
+                let mut program = optimized.clone();
+                program.activity = activity.clone();
+                program.activities = vec![activity.clone()];
+                encode_activity_dex(&program).unwrap()
+            })
+            .collect::<Vec<_>>();
+        for symbol in [
+            "Landroid/widget/LinearLayout;",
+            "Landroid/widget/ScrollView;",
+            "Landroid/widget/FrameLayout;",
+            "Landroid/widget/TextView;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/EditText;",
+            "Landroid/widget/CheckBox;",
+            "Landroid/widget/Switch;",
+            "Landroid/widget/ProgressBar;",
+            "Landroid/widget/ImageView;",
+            "Landroid/widget/Toolbar;",
+            "Landroid/widget/ListView;",
+            "Landroid/widget/Spinner;",
+            "setPadding",
+            "setVisibility",
+            "setEnabled",
+            "setTextAlignment",
+            "PopupMenu",
+            "AlertDialog$Builder",
+        ] {
+            assert!(
+                dexes.iter().any(|dex| dex
+                    .windows(symbol.len())
+                    .any(|window| window == symbol.as_bytes())),
+                "missing {symbol}"
+            );
+        }
+        for dex in &dexes {
+            assert_strict_method_id_order(dex);
+        }
+    }
+}

@@ -3697,6 +3697,127 @@ mod tests {
         assert_eq!(parse_program(&old_multi).unwrap_err().code, "AIC1404");
     }
     #[test]
+    fn m9_supported_ui_catalog_has_complete_evidence_inventory() {
+        let catalog = capability_catalog();
+        let supported = catalog
+            .split("\"supported\":[\"")
+            .nth(1)
+            .unwrap()
+            .split("\"],\n  \"planned\"")
+            .next()
+            .unwrap()
+            .split("\",\"")
+            .filter(|capability| {
+                capability.starts_with("ui.") || capability.starts_with("accessibility.")
+            })
+            .collect::<BTreeSet<_>>();
+        let evidence = include_str!("../../../schema/m9-ui-capability-evidence.tsv");
+        let mut inventoried = BTreeSet::new();
+        for (line_number, line) in evidence.lines().enumerate().skip(1) {
+            let columns = line.split('\t').collect::<Vec<_>>();
+            assert_eq!(
+                columns.len(),
+                7,
+                "evidence row {} must contain all seven columns",
+                line_number + 1
+            );
+            assert!(columns.iter().all(|value| !value.is_empty()));
+            assert!(inventoried.insert(columns[0]), "duplicate evidence row");
+        }
+        assert_eq!(supported, inventoried);
+    }
+    #[test]
+    fn m9_declared_ui_variants_verify() {
+        let source = r#"aic_version 0.2 app "UI audit" package "dev.aic.uiaudit" {
+          activity MainActivity { on_create {
+            let root = android.scroll_view()
+            let content = android.linear_layout(orientation: horizontal)
+            let start_text = android.text_view(text: "Start")
+            let center_text = android.text_view(text: "Center")
+            let end_text = android.text_view(text: "End")
+            let warning = android.image_view(icon: warning)
+            let deletion = android.image_view(icon: delete)
+            let list = android.list_view(items: ["One", "Two"])
+            let spinner = android.spinner(items: ["First", "Second"])
+            android.set_padding(view: content, left: 0, top: 1, right: 4095, bottom: 4096)
+            android.set_gravity(view: start_text, gravity: start)
+            android.set_gravity(view: center_text, gravity: center)
+            android.set_gravity(view: end_text, gravity: end)
+            android.set_visibility(view: start_text, visibility: visible)
+            android.set_visibility(view: center_text, visibility: invisible)
+            android.set_visibility(view: end_text, visibility: gone)
+            android.set_content_description(view: warning, text: "Warning")
+            android.set_decorative(view: deletion)
+            android.add_view(parent: content, child: start_text)
+            android.add_view(parent: content, child: center_text)
+            android.add_view(parent: content, child: end_text)
+            android.add_view(parent: content, child: warning)
+            android.add_view(parent: content, child: deletion)
+            android.add_view(parent: content, child: list)
+            android.add_view(parent: content, child: spinner)
+            android.add_view(parent: root, child: content)
+            android.set_content_view(root)
+          } }
+        }"#;
+        let program = parse_program(source).unwrap();
+        let body = &program.activity.on_create;
+        assert_eq!(
+            body.iter()
+                .filter(|s| matches!(s.kind, StatementKind::SetGravity { .. }))
+                .count(),
+            3
+        );
+        assert_eq!(
+            body.iter()
+                .filter(|s| matches!(s.kind, StatementKind::SetVisibility { .. }))
+                .count(),
+            3
+        );
+        assert_eq!(
+            body.iter()
+                .filter(|s| matches!(s.kind, StatementKind::ImageView { .. }))
+                .count(),
+            2
+        );
+        assert_eq!(
+            body.iter()
+                .filter(|s| matches!(
+                    s.kind,
+                    StatementKind::ListView {
+                        items: CollectionItems::Inline(_),
+                        ..
+                    } | StatementKind::Spinner {
+                        items: CollectionItems::Inline(_),
+                        ..
+                    }
+                ))
+                .count(),
+            2
+        );
+        for (invalid, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-padding-range.aic"),
+                "AIC1410",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-gravity-value.aic"),
+                "AIC1412",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-visibility-value.aic"),
+                "AIC1411",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-icon-value.aic"),
+                "AIC1413",
+            ),
+        ] {
+            let error = parse_program(invalid).unwrap_err();
+            assert_eq!(error.code, code);
+            assert!(error.location.is_some());
+        }
+    }
+    #[test]
     fn m9_layout_dimensions_margins_and_containment_verify() {
         let source = include_str!("../../../testdata/m9-navigation.aic");
         let program = parse_program(source).unwrap();

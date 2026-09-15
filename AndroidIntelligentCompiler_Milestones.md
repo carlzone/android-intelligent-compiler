@@ -299,13 +299,13 @@ M9 execution is divided into durable checkpoints. `Implemented` means the code a
 | --- | --- | --- | --- |
 | M9.1 | IR 0.2, deterministic 0.1 migration, capability catalog, CLI/JNI/host version contract | Implemented | Keep regression coverage green |
 | M9.2 | Multi-screen lifecycle and typed navigation | Partial | Typed extras implemented; start-for-result, typed results, and Bundle restoration remain |
-| M9.3 | Production layouts, widgets, reusable rows, and accessibility validation | Partial | Core accessibility and literal color properties have local and API 36 ARM64 evidence; resume with remaining families and broader device coverage |
+| M9.3 | Production layouts, widgets, reusable rows, and accessibility validation | Implemented | Representative API 36 hardware/API 35 automated matrix complete; non-hardware manual TalkBack explicitly waived |
 | M9.4 | Resource table, localization, themes, icons, and project image packaging | Partial | Project archive validation exists; compiler packaging remains |
 | M9.5 | Orientation, compact/expanded adaptation, lifecycle and accessibility corpus | Not started | Begin after navigation/state and resources stabilize |
 | M9.6 | Host/AI integration, diagnostics, reference applications, and documentation | Partial | Complete against the final M9 language surface |
 | M9.7 | Desktop, independent-tool, accessibility, and device acceptance | Blocked by implementation and M8 matrix | Run only from one recorded source/toolchain fingerprint |
 
-Current resume point: **M9.3 remaining widget/property families and broader device evidence**. IR 0.2 literal text/background colors now have complete schema, verifier, optimizer, direct DEX lowering, fixture, catalog, deterministic O0/O1 coverage, and passing API 36 ARM64 O0/O1 device evidence. Strict image/progress semantics and visibility/enabled validation retain their completed local and API 36 ARM64 O0/O1 evidence. M9.2 typed results and lifecycle-safe Bundle restoration remain open before milestone closure. The detailed ordered checklist and new-thread handoff are in `compiler/docs/m9-production-ui-navigation.md`.
+Current resume point: **M9.4 canonical resources and deterministic APK resource packaging**. M9.3 is implemented: API 36 ARM64/480dpi hardware passed the full O0/O1 and TalkBack scenarios, while API 35 x86_64 tablet 2560x1600/320dpi and compact 720x1280/240dpi profiles passed O0/O1 automation. The user explicitly waived manual TalkBack on non-hardware profiles; that limitation remains recorded. Exhaustive API compatibility remains in M8/M9.7. M9.2 typed results and lifecycle-safe Bundle restoration remain open before milestone closure.
 
 Objective: Expand AIC from the initial linear-layout profile into a practical, versioned Android UI and navigation language.
 
