@@ -1,0 +1,7 @@
+aic_version 0.2 app "Invalid" package "dev.aic.invalid" {
+  resources { string unused = "Unused" }
+  activity MainActivity { on_create {
+    let text = android.text_view(text: "Literal")
+    android.set_content_view(text)
+  } }
+}

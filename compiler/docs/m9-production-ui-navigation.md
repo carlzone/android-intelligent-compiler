@@ -68,17 +68,26 @@ The representative API 36 physical and API 35 tablet/compact matrix is complete.
 
 Completion gate: every declared widget/property family has parser, verifier, lowering, invalid fixtures, capability entries, and runnable examples.
 
-### M9.4 — Resources, localization, and project assets — Partial
+### M9.4 — Resources, localization, and project assets — Implemented
 
-Implemented: `.aicproject` format 2 stores deterministically ordered, checksummed, bounded PNG/WebP assets and continues reading source-only format 1 archives.
+Implemented: `.aicproject` format 2 stores deterministically ordered, checksummed, bounded PNG/WebP assets and continues reading source-only format 1 archives. The IR 0.2 foundation now has a canonical `resources { string ... }` model with a required default for every localized key, canonical BCP-47 locale validation, bounded values, duplicate rejection, source-located diagnostics, canonical model ordering, and order-independent `0x7f01xxxx` string ID assignment.
 
-Open: canonical default and BCP-47 string declarations, colors/themes/icons, generated resource IDs, deterministic `resources.arsc` and `res/**` packaging, locale configurations, project-image references, and host-to-compiler asset transfer. Malformed, oversized, duplicate, unsupported, and path-traversing assets must fail before build.
+Implemented in the completed tranche: compiler-owned deterministic `resources.arsc`, canonical `res/**` image entries, locale configurations, typed runtime string/color/image references, a bounded application theme and launcher icon, CLI/JNI/host asset transfer, and pre-build rejection of missing, extra, malformed, oversized, duplicate, unsupported, or path-traversing assets. Production builds do not invoke AAPT2; the desktop Build Tools 35 oracle compares fixed IDs and decoded resource semantics independently.
+
+The dedicated API 36 ARM64 physical-device checklist passed every item at both O0 and O1 on 2026-09-15. The signed APK, `resources.arsc`, and `classes.dex` were respectively byte-identical across optimization levels; the focused device result is recorded in `m9-acceptance-evidence.md`.
 
 Completion gate: resource output cross-checks against AAPT2, survives locale changes, and produces reproducible APK entries at O0/O1.
 
-### M9.5 — Adaptive layouts, lifecycle, and accessibility corpus — Not started
+### M9.5 — Adaptive layouts, lifecycle, and accessibility corpus — Implemented locally; device evidence pending
 
 Add portrait/landscape and compact/expanded variants selected through bounded Android window metrics, then validate rotation, process death, locale changes, font scaling, TalkBack semantics, touch targets, density, and screen size without unrestricted framework calls.
+
+Implemented: exhaustive qualified `on_create` variants at a fixed 600dp width
+breakpoint, verifier-enforced stable view signatures, deterministic configuration
+dispatch, compiler-owned scalar Bundle state, Android hierarchy restoration for
+mutable widgets and runtime text, password save suppression, invalid fixtures,
+O0/O1 corpus coverage, and the retained M9.5 function trace. Available-device
+evidence remains to be recorded; exhaustive compatibility remains M9.7.
 
 Completion gate: all declared configurations and accessibility scenarios pass on the supported matrix.
 
@@ -100,6 +109,6 @@ M9 cannot close until M9.1–M9.6 pass and the pre-existing M8 compatibility mat
 
 Read `m9-current-handoff.md` first, then this document, `m9-acceptance-evidence.md`, the IR 0.2 capability catalog, and the current worktree before editing. Preserve all existing uncommitted M9 changes and keep planned catalog entries unsupported until parser, verifier, lowering, fixtures, and tests exist.
 
-Resume M9.4 with **the canonical resource model and deterministic resource-package foundation**. M9.3 is complete: API 36 ARM64/480dpi physical-phone evidence and API 35 x86_64 tablet/compact O0/O1 automation pass; manual TalkBack on non-hardware API profiles was explicitly waived and remains documented as a limitation. Keep localization, resource images, and project-asset capability entries planned until their complete implementation evidence exists. Exhaustive API compatibility remains the separate M8/M9.7 gate.
+M9.4 is implemented and its localization, image, project-asset, and bounded color/theme/icon catalog entries passed their local evidence gates. Resume M9.2 typed results and Bundle restoration unless a focused M9.4 regression is requested. M9.3 is complete with the recorded API 36 physical and API 35 automated evidence; exhaustive compatibility remains the separate M8/M9.7 gate.
 
-M9.2 typed results and Bundle restoration remain open and must still be completed before M9 closure.
+M9.2 typed results remain open. Its Bundle-restoration dependency is implemented by the M9.5 lifecycle tranche.

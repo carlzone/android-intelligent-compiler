@@ -2,6 +2,6 @@
   "catalog_version":"aic.capabilities/0.2",
   "ir_version":"0.2",
   "profile":{"name":"android-35","min_sdk":23,"target_sdk":35},
-  "supported":["ui.layout.linear","ui.layout.scroll","ui.layout.frame","ui.layout.spacing","ui.visibility","ui.enabled","ui.alignment","ui.text","ui.text.size","ui.color","ui.button","ui.input.text","ui.input.common","ui.input.spinner","ui.image.builtin","ui.progress","ui.toolbar","ui.list.reusable_rows","ui.collection.string","ui.selection.events","ui.menu.popup","ui.dialog.alert","accessibility.content_description","accessibility.input_labels","accessibility.headings","accessibility.touch_targets","accessibility.semantics","persistence.key_value","persistence.sqlite","navigation.activities","navigation.extras.typed","navigation.finish"],
-  "planned":["ui.image.project_asset","lifecycle.state_restoration","resources.localization","resources.images","ui.adaptive"]
+  "supported":["ui.layout.linear","ui.layout.scroll","ui.layout.frame","ui.layout.spacing","ui.visibility","ui.enabled","ui.alignment","ui.text","ui.text.size","ui.color","ui.button","ui.input.text","ui.input.common","ui.input.spinner","ui.image.builtin","ui.image.project_asset","ui.progress","ui.toolbar","ui.list.reusable_rows","ui.collection.string","ui.selection.events","ui.menu.popup","ui.dialog.alert","accessibility.content_description","accessibility.input_labels","accessibility.headings","accessibility.touch_targets","accessibility.semantics","persistence.key_value","persistence.sqlite","navigation.activities","navigation.extras.typed","navigation.finish","resources.localization","resources.images","resources.color_theme_icon","lifecycle.state_restoration","ui.adaptive"],
+  "planned":[]
 }

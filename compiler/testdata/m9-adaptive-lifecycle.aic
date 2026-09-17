@@ -1,0 +1,110 @@
+aic_version 0.2
+app "AIC Adaptive" package "dev.aic.adaptive" {
+  resources {
+    string title = "Adaptive layout"
+    string title locale "zh-TW" = "自適應版面"
+  }
+  capability ui.adaptive
+  capability lifecycle.state_restoration
+  activity MainActivity {
+    state count: i32 = 0
+    state enabled: bool = false
+    state note: string = "initial"
+    state choices: string[] = ["First", "Second", "Third"]
+    on_create for portrait compact {
+      let root = android.linear_layout(orientation: vertical)
+      let title = android.text_view(text: resource.string(title) + " portrait compact")
+      let action = android.button(text: "Increment")
+      let input = android.text_input(hint: "Note", input_type: text)
+      let password = android.text_input(hint: "Password", input_type: password)
+      let checked = android.check_box(text: "Enabled")
+      let choice = android.spinner(items: choices)
+      android.set_heading(view: title)
+      android.set_layout(view: action, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: input, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: password, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: checked, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: choice, width: match_parent, height: 48, weight: 0)
+      android.add_view(parent: root, child: title)
+      android.add_view(parent: root, child: action)
+      android.add_view(parent: root, child: input)
+      android.add_view(parent: root, child: password)
+      android.add_view(parent: root, child: checked)
+      android.add_view(parent: root, child: choice)
+      android.set_content_view(root)
+    }
+    on_create for portrait expanded {
+      let root = android.linear_layout(orientation: horizontal)
+      let title = android.text_view(text: resource.string(title) + " portrait expanded")
+      let action = android.button(text: "Increment")
+      let input = android.text_input(hint: "Note", input_type: text)
+      let password = android.text_input(hint: "Password", input_type: password)
+      let checked = android.check_box(text: "Enabled")
+      let choice = android.spinner(items: choices)
+      android.set_heading(view: title)
+      android.set_layout(view: action, width: 120, height: 48, weight: 0)
+      android.set_layout(view: input, width: 180, height: 48, weight: 0)
+      android.set_layout(view: password, width: 180, height: 48, weight: 0)
+      android.set_layout(view: checked, width: 120, height: 48, weight: 0)
+      android.set_layout(view: choice, width: 120, height: 48, weight: 0)
+      android.add_view(parent: root, child: title)
+      android.add_view(parent: root, child: action)
+      android.add_view(parent: root, child: input)
+      android.add_view(parent: root, child: password)
+      android.add_view(parent: root, child: checked)
+      android.add_view(parent: root, child: choice)
+      android.set_content_view(root)
+    }
+    on_create for landscape compact {
+      let root = android.linear_layout(orientation: vertical)
+      let title = android.text_view(text: resource.string(title) + " landscape compact")
+      let action = android.button(text: "Increment")
+      let input = android.text_input(hint: "Note", input_type: text)
+      let password = android.text_input(hint: "Password", input_type: password)
+      let checked = android.check_box(text: "Enabled")
+      let choice = android.spinner(items: choices)
+      android.set_heading(view: title)
+      android.set_layout(view: action, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: input, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: password, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: checked, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: choice, width: match_parent, height: 48, weight: 0)
+      android.add_view(parent: root, child: title)
+      android.add_view(parent: root, child: action)
+      android.add_view(parent: root, child: input)
+      android.add_view(parent: root, child: password)
+      android.add_view(parent: root, child: checked)
+      android.add_view(parent: root, child: choice)
+      android.set_content_view(root)
+    }
+    on_create for landscape expanded {
+      let root = android.linear_layout(orientation: vertical)
+      let title = android.text_view(text: resource.string(title) + " landscape expanded")
+      let action = android.button(text: "Increment")
+      let input = android.text_input(hint: "Note", input_type: text)
+      let password = android.text_input(hint: "Password", input_type: password)
+      let checked = android.check_box(text: "Enabled")
+      let choice = android.spinner(items: choices)
+      android.set_heading(view: title)
+      android.set_layout(view: action, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: input, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: password, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: checked, width: match_parent, height: 48, weight: 0)
+      android.set_layout(view: choice, width: match_parent, height: 48, weight: 0)
+      android.add_view(parent: root, child: title)
+      android.add_view(parent: root, child: action)
+      android.add_view(parent: root, child: input)
+      android.add_view(parent: root, child: password)
+      android.add_view(parent: root, child: checked)
+      android.add_view(parent: root, child: choice)
+      android.set_content_view(root)
+    }
+    on_click(action) {
+      count = count + 1
+      android.set_text(view: title, text: "Updated")
+    }
+    on_select(choice, index, value) {
+      android.set_text(view: title, text: value)
+    }
+  }
+}

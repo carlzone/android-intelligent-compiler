@@ -5,31 +5,31 @@ The inventory is intentionally syntactic: generated/build directories are exclud
 
 ## Summary
 
-- Total functions: **416**
-- Documented functions: **25**
-- Undocumented functions: **391**
+- Total functions: **470**
+- Documented functions: **28**
+- Undocumented functions: **442**
 - Documentation coverage: **6.0%**
 
 | Language | Functions |
 |---|---:|
-| Kotlin | 87 |
+| Kotlin | 90 |
 | PowerShell | 17 |
-| Python | 34 |
-| Rust | 278 |
+| Python | 40 |
+| Rust | 323 |
 
 | Category | Functions |
 |---|---:|
-| compiler | 254 |
-| host | 81 |
-| test | 30 |
-| tooling | 51 |
+| compiler | 296 |
+| host | 84 |
+| test | 33 |
+| tooling | 57 |
 
 | Documentation priority | Functions | Meaning |
 |---|---:|---|
-| P0 | 136 | Undocumented public/external boundary; document first |
-| P1 | 229 | Undocumented compiler or Android-host implementation |
-| P2 | 26 | Undocumented tests and operational tooling |
-| Documented | 25 | Native doc comment detected |
+| P0 | 151 | Undocumented public/external boundary; document first |
+| P1 | 262 | Undocumented compiler or Android-host implementation |
+| P2 | 29 | Undocumented tests and operational tooling |
+| Documented | 28 | Native doc comment detected |
 
 ## How to use this audit
 
@@ -52,30 +52,38 @@ Add native documentation (`///`, KDoc, Python docstring, or PowerShell comment h
 | [ ] | `adler32` | Rust / compiler | `bytes: &[u8]` | `u32` | [`compiler/crates/aic-dex/src/integrity.rs:1`](../../compiler/crates/aic-dex/src/integrity.rs:1) |
 | [ ] | `sha1` | Rust / compiler | `bytes: &[u8]` | `[u8` | [`compiler/crates/aic-dex/src/integrity.rs:12`](../../compiler/crates/aic-dex/src/integrity.rs:12) |
 | [ ] | `lower_events` | Rust / compiler | `clicks: &[aic_ir::ClickHandler], selects: &[aic_ir::SelectHandler], target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: Option<StringLowering>, ui: UiLowering, state_fields: BTreeMap<String, (u16, Type)>, view_fields: BTreeMap<String, u16>, ready_fields: &BTreeMap<String, u16>, persistence: Option<PersistenceLowering>, preferences: &[Preference], tables: &[Table],` | `Result<LoweredEvents, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:36`](../../compiler/crates/aic-dex/src/lower.rs:36) |
-| [ ] | `lower_function` | Rust / compiler | `function: &Function, resolve: &dyn Fn(&str) -> Result<u16, DexError>,` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:1198`](../../compiler/crates/aic-dex/src/lower.rs:1198) |
-| [ ] | `lower_function_typed` | Rust / compiler | `function: &Function, target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: StringLowering,` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:1251`](../../compiler/crates/aic-dex/src/lower.rs:1251) |
-| [ ] | `lower_on_click` | Rust / compiler | `handlers: &[aic_ir::ClickHandler], target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: Option<StringLowering>, ui: UiLowering, state_fields: BTreeMap<String, (u16, Type)>, view_fields: BTreeMap<String, u16>, persistence: Option<PersistenceLowering>, preferences: &[Preference], tables: &[Table],` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:2443`](../../compiler/crates/aic-dex/src/lower.rs:2443) |
-| [ ] | `lower_on_select` | Rust / compiler | `handlers: &[aic_ir::SelectHandler], spinner: bool, target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: Option<StringLowering>, ui: UiLowering, state_fields: BTreeMap<String, (u16, Type)>, view_fields: BTreeMap<String, u16>, ready_fields: &BTreeMap<String, u16>, persistence: Option<PersistenceLowering>, preferences: &[Preference], tables: &[Table],` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:2517`](../../compiler/crates/aic-dex/src/lower.rs:2517) |
-| [ ] | `lower_on_create` | Rust / compiler | `statements: &[Statement], target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: Option<StringLowering>, ui: UiLowering, state_fields: BTreeMap<String, (u16, Type)>, collection_fields: BTreeMap<String, u16>, selection_views: BTreeMap<String, bool>, view_fields: BTreeMap<String, u16>, states: &[aic_ir::State], string_collections: &[aic_ir::StringCollectionState], persistence: Option<PersistenceLowering>, preferences: &[Preference], tables: &[Table],` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:2663`](../../compiler/crates/aic-dex/src/lower.rs:2663) |
-| [ ] | `create_table_sql` | Rust / compiler | `table: &Table` | `String` | [`compiler/crates/aic-dex/src/lower.rs:2862`](../../compiler/crates/aic-dex/src/lower.rs:2862) |
+| [ ] | `lower_function` | Rust / compiler | `function: &Function, resolve: &dyn Fn(&str) -> Result<u16, DexError>,` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:1279`](../../compiler/crates/aic-dex/src/lower.rs:1279) |
+| [ ] | `lower_function_typed` | Rust / compiler | `function: &Function, target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: StringLowering,` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:1332`](../../compiler/crates/aic-dex/src/lower.rs:1332) |
+| [ ] | `lower_on_click` | Rust / compiler | `handlers: &[aic_ir::ClickHandler], target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: Option<StringLowering>, ui: UiLowering, state_fields: BTreeMap<String, (u16, Type)>, view_fields: BTreeMap<String, u16>, persistence: Option<PersistenceLowering>, preferences: &[Preference], tables: &[Table],` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:2604`](../../compiler/crates/aic-dex/src/lower.rs:2604) |
+| [ ] | `lower_on_select` | Rust / compiler | `handlers: &[aic_ir::SelectHandler], spinner: bool, target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: Option<StringLowering>, ui: UiLowering, state_fields: BTreeMap<String, (u16, Type)>, view_fields: BTreeMap<String, u16>, ready_fields: &BTreeMap<String, u16>, persistence: Option<PersistenceLowering>, preferences: &[Preference], tables: &[Table],` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:2678`](../../compiler/crates/aic-dex/src/lower.rs:2678) |
+| [ ] | `lower_on_create` | Rust / compiler | `statements: &[Statement], variants: &[aic_ir::CreateVariant], activity_name: &str, target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>, string_index: &dyn Fn(&str) -> Result<u16, DexError>, strings: Option<StringLowering>, ui: UiLowering, state_fields: BTreeMap<String, (u16, Type)>, collection_fields: BTreeMap<String, u16>, selection_views: BTreeMap<String, bool>, view_fields: BTreeMap<String, u16>, states: &[aic_ir::State], string_collections: &[aic_ir::StringCollectionState], lifecycle: Option<LifecycleLowering>, persistence: Option<PersistenceLowering>, preferences: &[Preference], tables: &[Table],` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:2824`](../../compiler/crates/aic-dex/src/lower.rs:2824) |
+| [ ] | `lower_on_save_instance_state` | Rust / compiler | `states: &[aic_ir::State], activity_name: &str, string_index: &dyn Fn(&str) -> Result<u16, DexError>, state_fields: &BTreeMap<String, (u16, Type)>, lifecycle: LifecycleLowering,` | `Result<LoweredMethod, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:3170`](../../compiler/crates/aic-dex/src/lower.rs:3170) |
+| [ ] | `create_table_sql` | Rust / compiler | `table: &Table` | `String` | [`compiler/crates/aic-dex/src/lower.rs:3226`](../../compiler/crates/aic-dex/src/lower.rs:3226) |
 | [ ] | `new` | Rust / compiler | `v: impl Into<String>` | `Result<Self, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:70`](../../compiler/crates/aic-ir/src/lib.rs:70) |
 | [ ] | `descriptor` | Rust / compiler | `&self` | `&str` | [`compiler/crates/aic-ir/src/lib.rs:90`](../../compiler/crates/aic-ir/src/lib.rs:90) |
 | [ ] | `ty` | Rust / compiler | `&self` | `Type` | [`compiler/crates/aic-ir/src/lib.rs:109`](../../compiler/crates/aic-ir/src/lib.rs:109) |
-| [ ] | `name` | Rust / compiler | `self` | `&'static str` | [`compiler/crates/aic-ir/src/lib.rs:362`](../../compiler/crates/aic-ir/src/lib.rs:362) |
-| [ ] | `parse` | Rust / compiler | `source: &str` | `Result<SyntaxProgram, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1981`](../../compiler/crates/aic-ir/src/lib.rs:1981) |
-| [ ] | `parse_program` | Rust / compiler | `source: &str` | `Result<Program, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1988`](../../compiler/crates/aic-ir/src/lib.rs:1988) |
-| [ ] | `verify` | Rust / compiler | `mut s: SyntaxProgram` | `Result<Program, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2050`](../../compiler/crates/aic-ir/src/lib.rs:2050) |
-| [ ] | `evaluate_text` | Rust / compiler | `p: &Program` | `Result<String, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:3497`](../../compiler/crates/aic-ir/src/lib.rs:3497) |
-| [ ] | `Java_dev_aic_host_NativeCompiler_compile` | Rust / compiler | `mut env: JNIEnv, _: JClass, source: JString, output: JString, level: jint,` | `jstring` | [`compiler/crates/aic-jni/src/lib.rs:77`](../../compiler/crates/aic-jni/src/lib.rs:77) |
-| [ ] | `Java_dev_aic_host_NativeCompiler_validate` | Rust / compiler | `mut env: JNIEnv, _: JClass, source: JString, level: jint,` | `jstring` | [`compiler/crates/aic-jni/src/lib.rs:99`](../../compiler/crates/aic-jni/src/lib.rs:99) |
+| [ ] | `name` | Rust / compiler | `self` | `&'static str` | [`compiler/crates/aic-ir/src/lib.rs:382`](../../compiler/crates/aic-ir/src/lib.rs:382) |
+| [ ] | `parse` | Rust / compiler | `source: &str` | `Result<SyntaxProgram, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2377`](../../compiler/crates/aic-ir/src/lib.rs:2377) |
+| [ ] | `parse_program` | Rust / compiler | `source: &str` | `Result<Program, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2387`](../../compiler/crates/aic-ir/src/lib.rs:2387) |
+| [ ] | `verify` | Rust / compiler | `mut s: SyntaxProgram` | `Result<Program, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2453`](../../compiler/crates/aic-ir/src/lib.rs:2453) |
+| [ ] | `evaluate_text` | Rust / compiler | `p: &Program` | `Result<String, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:4480`](../../compiler/crates/aic-ir/src/lib.rs:4480) |
+| [ ] | `Java_dev_aic_host_NativeCompiler_compile` | Rust / compiler | `mut env: JNIEnv, _: JClass, source: JString, assets: JString, output: JString, level: jint,` | `jstring` | [`compiler/crates/aic-jni/src/lib.rs:125`](../../compiler/crates/aic-jni/src/lib.rs:125) |
+| [ ] | `Java_dev_aic_host_NativeCompiler_validate` | Rust / compiler | `mut env: JNIEnv, _: JClass, source: JString, assets: JString, level: jint,` | `jstring` | [`compiler/crates/aic-jni/src/lib.rs:154`](../../compiler/crates/aic-jni/src/lib.rs:154) |
 | [ ] | `removed_functions` | Rust / compiler | `&self` | `usize` | [`compiler/crates/aic-opt/src/lib.rs:41`](../../compiler/crates/aic-opt/src/lib.rs:41) |
 | [ ] | `removed_resources` | Rust / compiler | `&self` | `usize` | [`compiler/crates/aic-opt/src/lib.rs:45`](../../compiler/crates/aic-opt/src/lib.rs:45) |
 | [ ] | `optimize` | Rust / compiler | `program: Program, options: CompilerOptions` | `Program` | [`compiler/crates/aic-opt/src/lib.rs:53`](../../compiler/crates/aic-opt/src/lib.rs:53) |
 | [ ] | `optimize_with_report` | Rust / compiler | `mut p: Program, options: CompilerOptions, ) -> (Program, OptimizationReport` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:57`](../../compiler/crates/aic-opt/src/lib.rs:57) |
-| [ ] | `analyze` | Rust / compiler | `p: &Program` | `Reachability` | [`compiler/crates/aic-opt/src/lib.rs:104`](../../compiler/crates/aic-opt/src/lib.rs:104) |
-| [ ] | `new` | Rust / compiler | `package: &str, label: &str, activity: &str` | `Self` | [`compiler/crates/aic-res/src/lib.rs:63`](../../compiler/crates/aic-res/src/lib.rs:63) |
-| [ ] | `new_multi` | Rust / compiler | `package: &str, label: &str, activities: &[String]` | `Self` | [`compiler/crates/aic-res/src/lib.rs:67`](../../compiler/crates/aic-res/src/lib.rs:67) |
-| [ ] | `text` | Rust / compiler | `&self` | `String` | [`compiler/crates/aic-res/src/lib.rs:137`](../../compiler/crates/aic-res/src/lib.rs:137) |
+| [ ] | `analyze` | Rust / compiler | `p: &Program` | `Reachability` | [`compiler/crates/aic-opt/src/lib.rs:107`](../../compiler/crates/aic-opt/src/lib.rs:107) |
+| [ ] | `string` | Rust / compiler | `&self, name: &str` | `Option<u32>` | [`compiler/crates/aic-res/src/lib.rs:107`](../../compiler/crates/aic-res/src/lib.rs:107) |
+| [ ] | `iter_strings` | Rust / compiler | `&self) -> impl Iterator<Item = (&str, u32` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:110`](../../compiler/crates/aic-res/src/lib.rs:110) |
+| [ ] | `color` | Rust / compiler | `&self, name: &str` | `Option<u32>` | [`compiler/crates/aic-res/src/lib.rs:114`](../../compiler/crates/aic-res/src/lib.rs:114) |
+| [ ] | `drawable` | Rust / compiler | `&self, name: &str` | `Option<u32>` | [`compiler/crates/aic-res/src/lib.rs:118`](../../compiler/crates/aic-res/src/lib.rs:118) |
+| [ ] | `mipmap` | Rust / compiler | `&self, name: &str` | `Option<u32>` | [`compiler/crates/aic-res/src/lib.rs:122`](../../compiler/crates/aic-res/src/lib.rs:122) |
+| [ ] | `style` | Rust / compiler | `&self, name: &str` | `Option<u32>` | [`compiler/crates/aic-res/src/lib.rs:126`](../../compiler/crates/aic-res/src/lib.rs:126) |
+| [ ] | `new` | Rust / compiler | `package: &str, label: &str, activity: &str` | `Self` | [`compiler/crates/aic-res/src/lib.rs:580`](../../compiler/crates/aic-res/src/lib.rs:580) |
+| [ ] | `new_multi` | Rust / compiler | `package: &str, label: &str, activities: &[String]` | `Self` | [`compiler/crates/aic-res/src/lib.rs:584`](../../compiler/crates/aic-res/src/lib.rs:584) |
+| [ ] | `new_multi_resources` | Rust / compiler | `package: &str, label: &str, activities: &[String], theme: Option<u32>, icon: Option<u32>,` | `Self` | [`compiler/crates/aic-res/src/lib.rs:588`](../../compiler/crates/aic-res/src/lib.rs:588) |
+| [ ] | `text` | Rust / compiler | `&self` | `String` | [`compiler/crates/aic-res/src/lib.rs:672`](../../compiler/crates/aic-res/src/lib.rs:672) |
 | [ ] | `Get-Ui` | PowerShell / tooling | `-` | `implicit` | [`compiler/scripts/benchmark-m5.ps1:8`](../../compiler/scripts/benchmark-m5.ps1:8) |
 | [ ] | `Get-Median` | PowerShell / tooling | `-` | `implicit` | [`compiler/scripts/benchmark-m5.ps1:9`](../../compiler/scripts/benchmark-m5.ps1:9) |
 | [ ] | `Invoke-AicTool` | PowerShell / tooling | `-` | `implicit` | [`compiler/scripts/build-m1.ps1:24`](../../compiler/scripts/build-m1.ps1:24) |
@@ -99,12 +107,18 @@ Add native documentation (`///`, KDoc, Python docstring, or PowerShell comment h
 | [ ] | `verify_apk` | Python / tooling | `apk, folder, tools` | `implicit/unit` | [`compiler/scripts/verify-m8.py:73`](../../compiler/scripts/verify-m8.py:73) |
 | [ ] | `inspect_host` | Python / tooling | `apk` | `implicit/unit` | [`compiler/scripts/verify-m8.py:87`](../../compiler/scripts/verify-m8.py:87) |
 | [ ] | `main` | Python / tooling | `-` | `implicit/unit` | [`compiler/scripts/verify-m8.py:98`](../../compiler/scripts/verify-m8.py:98) |
+| [ ] | `run` | Python / tooling | `command: list[str], cwd: pathlib.Path \| None = None` | `str:` | [`compiler/scripts/verify-m9-resources.py:19`](../../compiler/scripts/verify-m9-resources.py:19) |
+| [ ] | `sdk_tools` | Python / tooling | `sdk: pathlib.Path` | `tuple[pathlib.Path, pathlib.Path]:` | [`compiler/scripts/verify-m9-resources.py:26`](../../compiler/scripts/verify-m9-resources.py:26) |
+| [ ] | `write_inputs` | Python / tooling | `root: pathlib.Path` | `tuple[pathlib.Path, pathlib.Path]:` | [`compiler/scripts/verify-m9-resources.py:34`](../../compiler/scripts/verify-m9-resources.py:34) |
+| [ ] | `write_oracle_resources` | Python / tooling | `root: pathlib.Path` | `pathlib.Path:` | [`compiler/scripts/verify-m9-resources.py:63`](../../compiler/scripts/verify-m9-resources.py:63) |
+| [ ] | `semantic_lines` | Python / tooling | `dump: str` | `set[str]:` | [`compiler/scripts/verify-m9-resources.py:83`](../../compiler/scripts/verify-m9-resources.py:83) |
+| [ ] | `main` | Python / tooling | `-` | `None:` | [`compiler/scripts/verify-m9-resources.py:88`](../../compiler/scripts/verify-m9-resources.py:88) |
 | [ ] | `onCreate` | Kotlin / test | `arguments: Bundle?) { super.onCreate(arguments); start(` | `implicit/unit` | [`host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:20`](../../host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:20) |
 | [ ] | `onStart` | Kotlin / test | `-` | `implicit/unit` | [`host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:21`](../../host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:21) |
 | [ ] | `acceptanceProject` | Kotlin / test | `data: ProjectData): StoredProject = store.list(` | `implicit/unit` | [`host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:32`](../../host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:32) |
-| [ ] | `start` | Kotlin / host | `projectId: String?, operation: AiOperation, prompt: String, current: String?, level: Int` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AiController.kt:16`](../../host/app/src/main/java/dev/aic/host/AiController.kt:16) |
-| [ ] | `clear` | Kotlin / host | `) { outcome=null; changed?.invoke(` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AiController.kt:42`](../../host/app/src/main/java/dev/aic/host/AiController.kt:42) |
-| [ ] | `get` | Kotlin / host | `context: Context): AiController=instance ?: synchronized(this` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AiController.kt:46`](../../host/app/src/main/java/dev/aic/host/AiController.kt:46) |
+| [ ] | `start` | Kotlin / host | `projectId: String?, operation: AiOperation, prompt: String, current: String?, level: Int, images: Map<String,ByteArray>` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AiController.kt:18`](../../host/app/src/main/java/dev/aic/host/AiController.kt:18) |
+| [ ] | `clear` | Kotlin / host | `) { outcome=null; changed?.invoke(` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AiController.kt:47`](../../host/app/src/main/java/dev/aic/host/AiController.kt:47) |
+| [ ] | `get` | Kotlin / host | `context: Context): AiController=instance ?: synchronized(this` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AiController.kt:51`](../../host/app/src/main/java/dev/aic/host/AiController.kt:51) |
 | [ ] | `parse` | Kotlin / host | `answer: ModelAnswer, expected: AiOperation` | `AiProposal` | [`host/app/src/main/java/dev/aic/host/AiProtocol.kt:27`](../../host/app/src/main/java/dev/aic/host/AiProtocol.kt:27) |
 | [ ] | `packageName` | Kotlin / host | `source: String): String? = Regex("""\bpackage\s+"([a-zA-Z0-9_.]+)"""").find(source)?.groupValues?.get(1` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AiProtocol.kt:47`](../../host/app/src/main/java/dev/aic/host/AiProtocol.kt:47) |
 | [ ] | `hash` | Kotlin / host | `text: String): String=MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AiProtocol.kt:48`](../../host/app/src/main/java/dev/aic/host/AiProtocol.kt:48) |
@@ -118,8 +132,9 @@ Add native documentation (`///`, KDoc, Python docstring, or PowerShell comment h
 | [ ] | `launch` | Kotlin / host | `activity: Activity` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/AppInstaller.kt:49`](../../host/app/src/main/java/dev/aic/host/AppInstaller.kt:49) |
 | [ ] | `start` | Kotlin / host | `project: StoredProject` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/BuildController.kt:37`](../../host/app/src/main/java/dev/aic/host/BuildController.kt:37) |
 | [ ] | `get` | Kotlin / host | `context: Context): BuildController = instance ?: synchronized(this` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/BuildController.kt:68`](../../host/app/src/main/java/dev/aic/host/BuildController.kt:68) |
-| [ ] | `hash` | Kotlin / host | `data: ProjectData): String = MessageDigest.getInstance("SHA-256"` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/BuildController.kt:71`](../../host/app/src/main/java/dev/aic/host/BuildController.kt:71) |
-| [ ] | `build` | Kotlin / host | `source: String, level: Int, directory: File, progress: (String) -> Unit` | `BuiltApp` | [`host/app/src/main/java/dev/aic/host/BuildPipeline.kt:11`](../../host/app/src/main/java/dev/aic/host/BuildPipeline.kt:11) |
+| [ ] | `hash` | Kotlin / host | `data: ProjectData` | `String` | [`host/app/src/main/java/dev/aic/host/BuildController.kt:71`](../../host/app/src/main/java/dev/aic/host/BuildController.kt:71) |
+| [ ] | `build` | Kotlin / host | `project: ProjectData, directory: File, progress: (String) -> Unit` | `BuiltApp` | [`host/app/src/main/java/dev/aic/host/BuildPipeline.kt:11`](../../host/app/src/main/java/dev/aic/host/BuildPipeline.kt:11) |
+| [ ] | `build` | Kotlin / host | `source: String, level: Int, directory: File, progress: (String) -> Unit` | `BuiltApp` | [`host/app/src/main/java/dev/aic/host/BuildPipeline.kt:16`](../../host/app/src/main/java/dev/aic/host/BuildPipeline.kt:16) |
 | [ ] | `onReceive` | Kotlin / host | `context: Context, intent: Intent` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/InstallReceiver.kt:9`](../../host/app/src/main/java/dev/aic/host/InstallReceiver.kt:9) |
 | [ ] | `onCreate` | Kotlin / host | `savedInstanceState: Bundle?` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/MainActivity.kt:42`](../../host/app/src/main/java/dev/aic/host/MainActivity.kt:42) |
 | [ ] | `row` | Kotlin / host | `vararg actions: Pair<String,()->Unit>): LinearLayout = LinearLayout(this` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/MainActivity.kt:52`](../../host/app/src/main/java/dev/aic/host/MainActivity.kt:52) |
@@ -181,48 +196,54 @@ Add native documentation (`///`, KDoc, Python docstring, or PowerShell comment h
 | Done | Function | Language / role | Parameters | Returns | Location |
 |---|---|---|---|---|---|
 | [ ] | `fmt` | Rust / compiler | `&self, f: &mut std::fmt::Formatter<'_>` | `std::fmt::Result` | [`compiler/crates/aic-build/src/lib.rs:13`](../../compiler/crates/aic-build/src/lib.rs:13) |
-| [ ] | `fmt` | Rust / compiler | `&self, f: &mut std::fmt::Formatter<'_>` | `std::fmt::Result` | [`compiler/crates/aic-build/src/lib.rs:141`](../../compiler/crates/aic-build/src/lib.rs:141) |
-| [ ] | `from` | Rust / compiler | `_: std::num::TryFromIntError` | `Self` | [`compiler/crates/aic-build/src/lib.rs:147`](../../compiler/crates/aic-build/src/lib.rs:147) |
-| [ ] | `u16_at` | Rust / compiler | `bytes: &[u8], offset: usize` | `Result<u16, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:151`](../../compiler/crates/aic-build/src/lib.rs:151) |
-| [ ] | `u32_at` | Rust / compiler | `bytes: &[u8], offset: usize` | `Result<u32, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:157`](../../compiler/crates/aic-build/src/lib.rs:157) |
-| [ ] | `crc32` | Rust / compiler | `data: &[u8]` | `u32` | [`compiler/crates/aic-build/src/lib.rs:263`](../../compiler/crates/aic-build/src/lib.rs:263) |
-| [ ] | `fixtures_match_direct_pipeline_and_are_reproducible` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:278`](../../compiler/crates/aic-build/src/lib.rs:278) |
-| [ ] | `source_locations_survive_api_boundary` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:296`](../../compiler/crates/aic-build/src/lib.rs:296) |
-| [ ] | `m9_packages_multiple_verified_activities_deterministically` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:302`](../../compiler/crates/aic-build/src/lib.rs:302) |
-| [ ] | `zip_alignment_and_bad_input` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:324`](../../compiler/crates/aic-build/src/lib.rs:324) |
+| [ ] | `validate_project_assets` | Rust / compiler | `program: &aic_ir::Program, assets: &[ProjectAsset],` | `Result<Vec<aic_res::FileResource>, BuildError>` | [`compiler/crates/aic-build/src/lib.rs:207`](../../compiler/crates/aic-build/src/lib.rs:207) |
+| [ ] | `validate_image` | Rust / compiler | `name: &str, bytes: &[u8]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:280`](../../compiler/crates/aic-build/src/lib.rs:280) |
+| [ ] | `valid_apk_entry` | Rust / compiler | `name: &str` | `bool` | [`compiler/crates/aic-build/src/lib.rs:363`](../../compiler/crates/aic-build/src/lib.rs:363) |
+| [ ] | `fmt` | Rust / compiler | `&self, f: &mut std::fmt::Formatter<'_>` | `std::fmt::Result` | [`compiler/crates/aic-build/src/lib.rs:374`](../../compiler/crates/aic-build/src/lib.rs:374) |
+| [ ] | `from` | Rust / compiler | `_: std::num::TryFromIntError` | `Self` | [`compiler/crates/aic-build/src/lib.rs:380`](../../compiler/crates/aic-build/src/lib.rs:380) |
+| [ ] | `u16_at` | Rust / compiler | `bytes: &[u8], offset: usize` | `Result<u16, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:384`](../../compiler/crates/aic-build/src/lib.rs:384) |
+| [ ] | `u32_at` | Rust / compiler | `bytes: &[u8], offset: usize` | `Result<u32, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:390`](../../compiler/crates/aic-build/src/lib.rs:390) |
+| [ ] | `crc32` | Rust / compiler | `data: &[u8]` | `u32` | [`compiler/crates/aic-build/src/lib.rs:496`](../../compiler/crates/aic-build/src/lib.rs:496) |
+| [ ] | `fixtures_match_direct_pipeline_and_are_reproducible` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:511`](../../compiler/crates/aic-build/src/lib.rs:511) |
+| [ ] | `source_locations_survive_api_boundary` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:531`](../../compiler/crates/aic-build/src/lib.rs:531) |
+| [ ] | `m9_packages_multiple_verified_activities_deterministically` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:537`](../../compiler/crates/aic-build/src/lib.rs:537) |
+| [ ] | `m9_exposes_canonical_string_resource_ids` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:559`](../../compiler/crates/aic-build/src/lib.rs:559) |
+| [ ] | `m9_packages_localized_typed_resources_and_assets_deterministically` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:583`](../../compiler/crates/aic-build/src/lib.rs:583) |
+| [ ] | `zip_alignment_and_bad_input` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-build/src/lib.rs:640`](../../compiler/crates/aic-build/src/lib.rs:640) |
 | [ ] | `main` | Rust / compiler | `-` | `ExitCode` | [`compiler/crates/aic-cli/src/main.rs:14`](../../compiler/crates/aic-cli/src/main.rs:14) |
 | [ ] | `run` | Rust / compiler | `) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-cli/src/main.rs:23`](../../compiler/crates/aic-cli/src/main.rs:23) |
 | [ ] | `migrate` | Rust / compiler | `args: &[OsString]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-cli/src/main.rs:33`](../../compiler/crates/aic-cli/src/main.rs:33) |
 | [ ] | `emit_minimal` | Rust / compiler | `) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-cli/src/main.rs:44`](../../compiler/crates/aic-cli/src/main.rs:44) |
 | [ ] | `compile` | Rust / compiler | `args: &[OsString]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-cli/src/main.rs:54`](../../compiler/crates/aic-cli/src/main.rs:54) |
-| [ ] | `assemble` | Rust / compiler | `args: &[OsString]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-cli/src/main.rs:92`](../../compiler/crates/aic-cli/src/main.rs:92) |
-| [ ] | `option` | Rust / compiler | `args: &[OsString], name: &str` | `Result<PathBuf, Box<dyn Error>>` | [`compiler/crates/aic-cli/src/main.rs:100`](../../compiler/crates/aic-cli/src/main.rs:100) |
-| [ ] | `optional` | Rust / compiler | `args: &[OsString], name: &str` | `Option<PathBuf>` | [`compiler/crates/aic-cli/src/main.rs:109`](../../compiler/crates/aic-cli/src/main.rs:109) |
-| [ ] | `write_file` | Rust / compiler | `path: &Path, bytes: &[u8]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-cli/src/main.rs:115`](../../compiler/crates/aic-cli/src/main.rs:115) |
+| [ ] | `read_assets` | Rust / compiler | `directory: &Path` | `Result<Vec<ProjectAsset>, Box<dyn Error>>` | [`compiler/crates/aic-cli/src/main.rs:103`](../../compiler/crates/aic-cli/src/main.rs:103) |
+| [ ] | `assemble` | Rust / compiler | `args: &[OsString]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-cli/src/main.rs:123`](../../compiler/crates/aic-cli/src/main.rs:123) |
+| [ ] | `option` | Rust / compiler | `args: &[OsString], name: &str` | `Result<PathBuf, Box<dyn Error>>` | [`compiler/crates/aic-cli/src/main.rs:131`](../../compiler/crates/aic-cli/src/main.rs:131) |
+| [ ] | `optional` | Rust / compiler | `args: &[OsString], name: &str` | `Option<PathBuf>` | [`compiler/crates/aic-cli/src/main.rs:140`](../../compiler/crates/aic-cli/src/main.rs:140) |
+| [ ] | `write_file` | Rust / compiler | `path: &Path, bytes: &[u8]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-cli/src/main.rs:146`](../../compiler/crates/aic-cli/src/main.rs:146) |
 | [ ] | `build` | Rust / compiler | `class: &str, program: &Program` | `Result<Self, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:52`](../../compiler/crates/aic-dex/src/activity.rs:52) |
-| [ ] | `field` | Rust / compiler | `&self, class: &str, name: &str` | `Result<u16, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1339`](../../compiler/crates/aic-dex/src/activity.rs:1339) |
-| [ ] | `method` | Rust / compiler | `&self, class: &str, name: &str, proto: &Proto` | `Result<u16, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1346`](../../compiler/crates/aic-dex/src/activity.rs:1346) |
-| [ ] | `proto_index` | Rust / compiler | `&self, proto: &Proto` | `Result<u16, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1353`](../../compiler/crates/aic-dex/src/activity.rs:1353) |
-| [ ] | `type_descriptor` | Rust / compiler | `ty: Type` | `&'static str` | [`compiler/crates/aic-dex/src/activity.rs:1361`](../../compiler/crates/aic-dex/src/activity.rs:1361) |
-| [ ] | `view_id` | Rust / compiler | `statement: &Statement` | `Option<&str>` | [`compiler/crates/aic-dex/src/activity.rs:1368`](../../compiler/crates/aic-dex/src/activity.rs:1368) |
-| [ ] | `view_field` | Rust / compiler | `statement: &Statement) -> Option<(&str, &'static str` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1371`](../../compiler/crates/aic-dex/src/activity.rs:1371) |
-| [ ] | `collect_program_strings` | Rust / compiler | `program: &Program, strings: &mut BTreeSet<String>` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1392`](../../compiler/crates/aic-dex/src/activity.rs:1392) |
-| [ ] | `collect_statement_strings` | Rust / compiler | `statements: &[Statement], strings: &mut BTreeSet<String>` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1418`](../../compiler/crates/aic-dex/src/activity.rs:1418) |
-| [ ] | `collect_expression_strings` | Rust / compiler | `expression: &Expression, strings: &mut BTreeSet<String>` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1511`](../../compiler/crates/aic-dex/src/activity.rs:1511) |
-| [ ] | `primary` | Rust / compiler | `program: &Program, table: &str` | `String` | [`compiler/crates/aic-dex/src/activity.rs:1556`](../../compiler/crates/aic-dex/src/activity.rs:1556) |
-| [ ] | `collect_persistence_sql` | Rust / compiler | `statements: &[Statement], program: &Program, strings: &mut BTreeSet<String>,` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1565`](../../compiler/crates/aic-dex/src/activity.rs:1565) |
-| [ ] | `expression` | Rust / compiler | `value: &Expression, program: &Program, strings: &mut BTreeSet<String>` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1570`](../../compiler/crates/aic-dex/src/activity.rs:1570) |
-| [ ] | `descriptor` | Rust / compiler | `ty: Type` | `&'static str` | [`compiler/crates/aic-dex/src/activity.rs:1673`](../../compiler/crates/aic-dex/src/activity.rs:1673) |
-| [ ] | `function_proto` | Rust / compiler | `function: &Function` | `Proto` | [`compiler/crates/aic-dex/src/activity.rs:1679`](../../compiler/crates/aic-dex/src/activity.rs:1679) |
-| [ ] | `shorty` | Rust / compiler | `proto: &Proto` | `String` | [`compiler/crates/aic-dex/src/activity.rs:1690`](../../compiler/crates/aic-dex/src/activity.rs:1690) |
-| [ ] | `shorty_type` | Rust / compiler | `value: &str` | `&str` | [`compiler/crates/aic-dex/src/activity.rs:1697`](../../compiler/crates/aic-dex/src/activity.rs:1697) |
-| [ ] | `u32_len` | Rust / compiler | `value: usize` | `Result<u32, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1704`](../../compiler/crates/aic-dex/src/activity.rs:1704) |
-| [ ] | `align4` | Rust / compiler | `value: u32` | `Result<u32, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1707`](../../compiler/crates/aic-dex/src/activity.rs:1707) |
-| [ ] | `encode` | Rust / compiler | `pool: &Pool, class: &str, program: &Program` | `Result<Vec<u8>, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1730`](../../compiler/crates/aic-dex/src/activity.rs:1730) |
-| [ ] | `class_data_item` | Rust / compiler | `fields: &[u16], init: u16, init_code: u32, create: u16, create_code: u32, events: &[(u16, u32)], functions: &[(u16, u32)],` | `Vec<u8>` | [`compiler/crates/aic-dex/src/activity.rs:3027`](../../compiler/crates/aic-dex/src/activity.rs:3027) |
-| [ ] | `write_code` | Rust / compiler | `out: &mut ByteWriter, registers: u16, ins: u16, outs: u16, code: &[u16]` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:3073`](../../compiler/crates/aic-dex/src/activity.rs:3073) |
-| [ ] | `size_off` | Rust / compiler | `out: &mut ByteWriter, size: usize, offset: u32) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:3084`](../../compiler/crates/aic-dex/src/activity.rs:3084) |
-| [ ] | `deterministic_activity_dex` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:3096`](../../compiler/crates/aic-dex/src/activity.rs:3096) |
+| [ ] | `field` | Rust / compiler | `&self, class: &str, name: &str` | `Result<u16, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1483`](../../compiler/crates/aic-dex/src/activity.rs:1483) |
+| [ ] | `method` | Rust / compiler | `&self, class: &str, name: &str, proto: &Proto` | `Result<u16, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1490`](../../compiler/crates/aic-dex/src/activity.rs:1490) |
+| [ ] | `proto_index` | Rust / compiler | `&self, proto: &Proto` | `Result<u16, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1497`](../../compiler/crates/aic-dex/src/activity.rs:1497) |
+| [ ] | `type_descriptor` | Rust / compiler | `ty: Type` | `&'static str` | [`compiler/crates/aic-dex/src/activity.rs:1505`](../../compiler/crates/aic-dex/src/activity.rs:1505) |
+| [ ] | `view_id` | Rust / compiler | `statement: &Statement` | `Option<&str>` | [`compiler/crates/aic-dex/src/activity.rs:1512`](../../compiler/crates/aic-dex/src/activity.rs:1512) |
+| [ ] | `view_field` | Rust / compiler | `statement: &Statement) -> Option<(&str, &'static str` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1515`](../../compiler/crates/aic-dex/src/activity.rs:1515) |
+| [ ] | `collect_program_strings` | Rust / compiler | `program: &Program, strings: &mut BTreeSet<String>` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1536`](../../compiler/crates/aic-dex/src/activity.rs:1536) |
+| [ ] | `collect_statement_strings` | Rust / compiler | `statements: &[Statement], strings: &mut BTreeSet<String>` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1565`](../../compiler/crates/aic-dex/src/activity.rs:1565) |
+| [ ] | `collect_expression_strings` | Rust / compiler | `expression: &Expression, strings: &mut BTreeSet<String>` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1660`](../../compiler/crates/aic-dex/src/activity.rs:1660) |
+| [ ] | `primary` | Rust / compiler | `program: &Program, table: &str` | `String` | [`compiler/crates/aic-dex/src/activity.rs:1707`](../../compiler/crates/aic-dex/src/activity.rs:1707) |
+| [ ] | `collect_persistence_sql` | Rust / compiler | `statements: &[Statement], program: &Program, strings: &mut BTreeSet<String>,` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1716`](../../compiler/crates/aic-dex/src/activity.rs:1716) |
+| [ ] | `expression` | Rust / compiler | `value: &Expression, program: &Program, strings: &mut BTreeSet<String>` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:1721`](../../compiler/crates/aic-dex/src/activity.rs:1721) |
+| [ ] | `descriptor` | Rust / compiler | `ty: Type` | `&'static str` | [`compiler/crates/aic-dex/src/activity.rs:1824`](../../compiler/crates/aic-dex/src/activity.rs:1824) |
+| [ ] | `function_proto` | Rust / compiler | `function: &Function` | `Proto` | [`compiler/crates/aic-dex/src/activity.rs:1830`](../../compiler/crates/aic-dex/src/activity.rs:1830) |
+| [ ] | `shorty` | Rust / compiler | `proto: &Proto` | `String` | [`compiler/crates/aic-dex/src/activity.rs:1841`](../../compiler/crates/aic-dex/src/activity.rs:1841) |
+| [ ] | `shorty_type` | Rust / compiler | `value: &str` | `&str` | [`compiler/crates/aic-dex/src/activity.rs:1848`](../../compiler/crates/aic-dex/src/activity.rs:1848) |
+| [ ] | `u32_len` | Rust / compiler | `value: usize` | `Result<u32, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1855`](../../compiler/crates/aic-dex/src/activity.rs:1855) |
+| [ ] | `align4` | Rust / compiler | `value: u32` | `Result<u32, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1858`](../../compiler/crates/aic-dex/src/activity.rs:1858) |
+| [ ] | `encode` | Rust / compiler | `pool: &Pool, class: &str, program: &Program` | `Result<Vec<u8>, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1881`](../../compiler/crates/aic-dex/src/activity.rs:1881) |
+| [ ] | `class_data_item` | Rust / compiler | `fields: &[u16], init: u16, init_code: u32, create: u16, create_code: u32, events: &[(u16, u32)], functions: &[(u16, u32)],` | `Vec<u8>` | [`compiler/crates/aic-dex/src/activity.rs:3285`](../../compiler/crates/aic-dex/src/activity.rs:3285) |
+| [ ] | `write_code` | Rust / compiler | `out: &mut ByteWriter, registers: u16, ins: u16, outs: u16, code: &[u16]` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:3331`](../../compiler/crates/aic-dex/src/activity.rs:3331) |
+| [ ] | `size_off` | Rust / compiler | `out: &mut ByteWriter, size: usize, offset: u32) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:3342`](../../compiler/crates/aic-dex/src/activity.rs:3342) |
+| [ ] | `deterministic_activity_dex` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/activity.rs:3354`](../../compiler/crates/aic-dex/src/activity.rs:3354) |
 | [ ] | `fmt` | Rust / compiler | `&self, f: &mut fmt::Formatter<'_>` | `fmt::Result` | [`compiler/crates/aic-dex/src/encoding.rs:13`](../../compiler/crates/aic-dex/src/encoding.rs:13) |
 | [ ] | `leb128_examples_and_boundaries` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/encoding.rs:159`](../../compiler/crates/aic-dex/src/encoding.rs:159) |
 | [ ] | `mutf8_handles_null_bmp_and_supplementary_values` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/encoding.rs:173`](../../compiler/crates/aic-dex/src/encoding.rs:173) |
@@ -241,36 +262,38 @@ Add native documentation (`///`, KDoc, Python docstring, or PowerShell comment h
 | [ ] | `encodes_boolean_instance_fields_with_typed_opcodes` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/lir.rs:612`](../../compiler/crates/aic-dex/src/lir.rs:612) |
 | [ ] | `encodes_static_sdk_field_and_rejects_reference_destination` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/lir.rs:639`](../../compiler/crates/aic-dex/src/lir.rs:639) |
 | [ ] | `encodes_object_array_creation_and_store` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/lir.rs:658`](../../compiler/crates/aic-dex/src/lir.rs:658) |
-| [ ] | `kind` | Rust / compiler | `t: Type` | `ValueKind` | [`compiler/crates/aic-dex/src/lower.rs:280`](../../compiler/crates/aic-dex/src/lower.rs:280) |
-| [ ] | `alloc` | Rust / compiler | `&mut self, t: Type` | `Result<Register, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:290`](../../compiler/crates/aic-dex/src/lower.rs:290) |
-| [ ] | `label` | Rust / compiler | `&mut self` | `Label` | [`compiler/crates/aic-dex/src/lower.rs:301`](../../compiler/crates/aic-dex/src/lower.rs:301) |
-| [ ] | `release_temporaries` | Rust / compiler | `&mut self, candidate: u8` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:306`](../../compiler/crates/aic-dex/src/lower.rs:306) |
-| [ ] | `initialize_minimum_touch_target` | Rust / compiler | `&mut self, context: Register, ui: UiLowering, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:321`](../../compiler/crates/aic-dex/src/lower.rs:321) |
-| [ ] | `apply_minimum_touch_target` | Rust / compiler | `&mut self, view: Register, ui: UiLowering, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:387`](../../compiler/crates/aic-dex/src/lower.rs:387) |
-| [ ] | `ty` | Rust / compiler | `&self, e: &Expression` | `Result<Type, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:411`](../../compiler/crates/aic-dex/src/lower.rs:411) |
-| [ ] | `mov` | Rust / compiler | `&mut self, d: Register, s: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:459`](../../compiler/crates/aic-dex/src/lower.rs:459) |
-| [ ] | `expr` | Rust / compiler | `&mut self, e: &Expression, d: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:470`](../../compiler/crates/aic-dex/src/lower.rs:470) |
-| [ ] | `expr0` | Rust / compiler | `&mut self, e: &Expression, d: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:481`](../../compiler/crates/aic-dex/src/lower.rs:481) |
-| [ ] | `preference_get` | Rust / compiler | `&mut self, key: &str, dst: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:740`](../../compiler/crates/aic-dex/src/lower.rs:740) |
-| [ ] | `literal` | Rust / compiler | `&mut self, value: &Value, dst: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:785`](../../compiler/crates/aic-dex/src/lower.rs:785) |
-| [ ] | `alloc_wide` | Rust / compiler | `&mut self` | `Result<u8, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:803`](../../compiler/crates/aic-dex/src/lower.rs:803) |
-| [ ] | `primary_key` | Rust / compiler | `&self, table: &str` | `Result<String, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:811`](../../compiler/crates/aic-dex/src/lower.rs:811) |
-| [ ] | `compile_statement` | Rust / compiler | `&mut self, sql: &str` | `Result<Register, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:818`](../../compiler/crates/aic-dex/src/lower.rs:818) |
-| [ ] | `bind_value` | Rust / compiler | `&mut self, statement: Register, index: i32, value: &Expression, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:850`](../../compiler/crates/aic-dex/src/lower.rs:850) |
-| [ ] | `close_statement` | Rust / compiler | `&mut self, statement: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:894`](../../compiler/crates/aic-dex/src/lower.rs:894) |
-| [ ] | `database_insert` | Rust / compiler | `&mut self, table: &str, values: &[(String, Expression)], dst: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:904`](../../compiler/crates/aic-dex/src/lower.rs:904) |
-| [ ] | `database_query` | Rust / compiler | `&mut self, table: &str, id: &Expression, column: Option<&String>, default: Option<&Expression>, dst: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:939`](../../compiler/crates/aic-dex/src/lower.rs:939) |
-| [ ] | `concat` | Rust / compiler | `&mut self, left: &Expression, right: &Expression, dst: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:979`](../../compiler/crates/aic-dex/src/lower.rs:979) |
-| [ ] | `string_equal` | Rust / compiler | `&mut self, op: BinaryOp, left: &Expression, right: &Expression, dst: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1017`](../../compiler/crates/aic-dex/src/lower.rs:1017) |
-| [ ] | `compare` | Rust / compiler | `&mut self, op: BinaryOp, a: Register, b: Register, d: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1048`](../../compiler/crates/aic-dex/src/lower.rs:1048) |
-| [ ] | `stmts` | Rust / compiler | `&mut self, body: &[Statement]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1106`](../../compiler/crates/aic-dex/src/lower.rs:1106) |
-| [ ] | `fill_string_array` | Rust / compiler | `&mut self, items: &[Expression], array: Register, array_type: u16, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1308`](../../compiler/crates/aic-dex/src/lower.rs:1308) |
-| [ ] | `on_create_statements` | Rust / compiler | `&mut self, statements: &[Statement], this: Register, ui: UiLowering, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1342`](../../compiler/crates/aic-dex/src/lower.rs:1342) |
-| [ ] | `load_view` | Rust / compiler | `&mut self, name: &str, this: Register` | `Result<Register, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:2332`](../../compiler/crates/aic-dex/src/lower.rs:2332) |
-| [ ] | `preference_set` | Rust / compiler | `&mut self, key: &str, value: &Expression) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:2348`](../../compiler/crates/aic-dex/src/lower.rs:2348) |
-| [ ] | `database_mutation` | Rust / compiler | `&mut self, table: &str, id: Option<&Expression>, values: &[(String, Expression)], ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:2397`](../../compiler/crates/aic-dex/src/lower.rs:2397) |
-| [ ] | `boolean_and_branches_before_rhs_division` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:2895`](../../compiler/crates/aic-dex/src/lower.rs:2895) |
-| [ ] | `lowers_runtime_string_conversion_concat_and_reference_return` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:2904`](../../compiler/crates/aic-dex/src/lower.rs:2904) |
+| [ ] | `kind` | Rust / compiler | `t: Type` | `ValueKind` | [`compiler/crates/aic-dex/src/lower.rs:297`](../../compiler/crates/aic-dex/src/lower.rs:297) |
+| [ ] | `alloc` | Rust / compiler | `&mut self, t: Type` | `Result<Register, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:307`](../../compiler/crates/aic-dex/src/lower.rs:307) |
+| [ ] | `label` | Rust / compiler | `&mut self` | `Label` | [`compiler/crates/aic-dex/src/lower.rs:318`](../../compiler/crates/aic-dex/src/lower.rs:318) |
+| [ ] | `release_temporaries` | Rust / compiler | `&mut self, candidate: u8` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:323`](../../compiler/crates/aic-dex/src/lower.rs:323) |
+| [ ] | `initialize_minimum_touch_target` | Rust / compiler | `&mut self, context: Register, ui: UiLowering, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:338`](../../compiler/crates/aic-dex/src/lower.rs:338) |
+| [ ] | `apply_minimum_touch_target` | Rust / compiler | `&mut self, view: Register, ui: UiLowering, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:404`](../../compiler/crates/aic-dex/src/lower.rs:404) |
+| [ ] | `assign_view_id` | Rust / compiler | `&mut self, name: &str, view: Register, ui: UiLowering, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:428`](../../compiler/crates/aic-dex/src/lower.rs:428) |
+| [ ] | `enable_text_state` | Rust / compiler | `&mut self, view: Register, ui: UiLowering) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:451`](../../compiler/crates/aic-dex/src/lower.rs:451) |
+| [ ] | `ty` | Rust / compiler | `&self, e: &Expression` | `Result<Type, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:465`](../../compiler/crates/aic-dex/src/lower.rs:465) |
+| [ ] | `mov` | Rust / compiler | `&mut self, d: Register, s: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:517`](../../compiler/crates/aic-dex/src/lower.rs:517) |
+| [ ] | `expr` | Rust / compiler | `&mut self, e: &Expression, d: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:528`](../../compiler/crates/aic-dex/src/lower.rs:528) |
+| [ ] | `expr0` | Rust / compiler | `&mut self, e: &Expression, d: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:539`](../../compiler/crates/aic-dex/src/lower.rs:539) |
+| [ ] | `preference_get` | Rust / compiler | `&mut self, key: &str, dst: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:821`](../../compiler/crates/aic-dex/src/lower.rs:821) |
+| [ ] | `literal` | Rust / compiler | `&mut self, value: &Value, dst: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:866`](../../compiler/crates/aic-dex/src/lower.rs:866) |
+| [ ] | `alloc_wide` | Rust / compiler | `&mut self` | `Result<u8, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:884`](../../compiler/crates/aic-dex/src/lower.rs:884) |
+| [ ] | `primary_key` | Rust / compiler | `&self, table: &str` | `Result<String, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:892`](../../compiler/crates/aic-dex/src/lower.rs:892) |
+| [ ] | `compile_statement` | Rust / compiler | `&mut self, sql: &str` | `Result<Register, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:899`](../../compiler/crates/aic-dex/src/lower.rs:899) |
+| [ ] | `bind_value` | Rust / compiler | `&mut self, statement: Register, index: i32, value: &Expression, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:931`](../../compiler/crates/aic-dex/src/lower.rs:931) |
+| [ ] | `close_statement` | Rust / compiler | `&mut self, statement: Register) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:975`](../../compiler/crates/aic-dex/src/lower.rs:975) |
+| [ ] | `database_insert` | Rust / compiler | `&mut self, table: &str, values: &[(String, Expression)], dst: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:985`](../../compiler/crates/aic-dex/src/lower.rs:985) |
+| [ ] | `database_query` | Rust / compiler | `&mut self, table: &str, id: &Expression, column: Option<&String>, default: Option<&Expression>, dst: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1020`](../../compiler/crates/aic-dex/src/lower.rs:1020) |
+| [ ] | `concat` | Rust / compiler | `&mut self, left: &Expression, right: &Expression, dst: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1060`](../../compiler/crates/aic-dex/src/lower.rs:1060) |
+| [ ] | `string_equal` | Rust / compiler | `&mut self, op: BinaryOp, left: &Expression, right: &Expression, dst: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1098`](../../compiler/crates/aic-dex/src/lower.rs:1098) |
+| [ ] | `compare` | Rust / compiler | `&mut self, op: BinaryOp, a: Register, b: Register, d: Register, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1129`](../../compiler/crates/aic-dex/src/lower.rs:1129) |
+| [ ] | `stmts` | Rust / compiler | `&mut self, body: &[Statement]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1187`](../../compiler/crates/aic-dex/src/lower.rs:1187) |
+| [ ] | `fill_string_array` | Rust / compiler | `&mut self, items: &[Expression], array: Register, array_type: u16, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1389`](../../compiler/crates/aic-dex/src/lower.rs:1389) |
+| [ ] | `on_create_statements` | Rust / compiler | `&mut self, statements: &[Statement], this: Register, ui: UiLowering, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:1423`](../../compiler/crates/aic-dex/src/lower.rs:1423) |
+| [ ] | `load_view` | Rust / compiler | `&mut self, name: &str, this: Register` | `Result<Register, DexError>` | [`compiler/crates/aic-dex/src/lower.rs:2493`](../../compiler/crates/aic-dex/src/lower.rs:2493) |
+| [ ] | `preference_set` | Rust / compiler | `&mut self, key: &str, value: &Expression) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:2509`](../../compiler/crates/aic-dex/src/lower.rs:2509) |
+| [ ] | `database_mutation` | Rust / compiler | `&mut self, table: &str, id: Option<&Expression>, values: &[(String, Expression)], ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:2558`](../../compiler/crates/aic-dex/src/lower.rs:2558) |
+| [ ] | `boolean_and_branches_before_rhs_division` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:3259`](../../compiler/crates/aic-dex/src/lower.rs:3259) |
+| [ ] | `lowers_runtime_string_conversion_concat_and_reference_return` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-dex/src/lower.rs:3268`](../../compiler/crates/aic-dex/src/lower.rs:3268) |
 | [ ] | `build` | Rust / compiler | `class: &MinimalClass` | `Result<Self, DexError>` | [`compiler/crates/aic-dex/src/writer.rs:34`](../../compiler/crates/aic-dex/src/writer.rs:34) |
 | [ ] | `to_u32` | Rust / compiler | `value: usize` | `Result<u32, DexError>` | [`compiler/crates/aic-dex/src/writer.rs:104`](../../compiler/crates/aic-dex/src/writer.rs:104) |
 | [ ] | `layout` | Rust / compiler | `indexes: &Indexes` | `Result<Layout, DexError>` | [`compiler/crates/aic-dex/src/writer.rs:108`](../../compiler/crates/aic-dex/src/writer.rs:108) |
@@ -283,107 +306,132 @@ Add native documentation (`///`, KDoc, Python docstring, or PowerShell comment h
 | [ ] | `at` | Rust / compiler | `code: &'static str, s: SourceSpan, m: impl Into<String>` | `Self` | [`compiler/crates/aic-ir/src/lib.rs:35`](../../compiler/crates/aic-ir/src/lib.rs:35) |
 | [ ] | `global` | Rust / compiler | `code: &'static str, m: impl Into<String>` | `Self` | [`compiler/crates/aic-ir/src/lib.rs:42`](../../compiler/crates/aic-ir/src/lib.rs:42) |
 | [ ] | `fmt` | Rust / compiler | `&self, f: &mut fmt::Formatter<'_>` | `fmt::Result` | [`compiler/crates/aic-ir/src/lib.rs:51`](../../compiler/crates/aic-ir/src/lib.rs:51) |
-| [ ] | `lex` | Rust / compiler | `src: &str` | `Result<Vec<Tok>, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:544`](../../compiler/crates/aic-ir/src/lib.rs:544) |
-| [ ] | `cur` | Rust / compiler | `&self` | `&Tok` | [`compiler/crates/aic-ir/src/lib.rs:753`](../../compiler/crates/aic-ir/src/lib.rs:753) |
-| [ ] | `pop` | Rust / compiler | `&mut self` | `Tok` | [`compiler/crates/aic-ir/src/lib.rs:756`](../../compiler/crates/aic-ir/src/lib.rs:756) |
-| [ ] | `word` | Rust / compiler | `&mut self, w: &str` | `Result<Tok, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:761`](../../compiler/crates/aic-ir/src/lib.rs:761) |
-| [ ] | `sym` | Rust / compiler | `&mut self, w: &'static str` | `Result<Tok, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:769`](../../compiler/crates/aic-ir/src/lib.rs:769) |
-| [ ] | `id` | Rust / compiler | `&mut self) -> Result<(String, SourceSpan` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:777`](../../compiler/crates/aic-ir/src/lib.rs:777) |
-| [ ] | `string` | Rust / compiler | `&mut self` | `Result<String, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:786`](../../compiler/crates/aic-ir/src/lib.rs:786) |
-| [ ] | `program` | Rust / compiler | `mut self` | `Result<SyntaxProgram, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:794`](../../compiler/crates/aic-ir/src/lib.rs:794) |
-| [ ] | `activity` | Rust / compiler | `&mut self` | `Result<SyntaxActivity, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:914`](../../compiler/crates/aic-ir/src/lib.rs:914) |
-| [ ] | `database` | Rust / compiler | `&mut self` | `Result<Database, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1010`](../../compiler/crates/aic-ir/src/lib.rs:1010) |
-| [ ] | `function` | Rust / compiler | `&mut self` | `Result<SyntaxFunction, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1067`](../../compiler/crates/aic-ir/src/lib.rs:1067) |
-| [ ] | `ty` | Rust / compiler | `&mut self` | `Result<Type, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1101`](../../compiler/crates/aic-ir/src/lib.rs:1101) |
-| [ ] | `block` | Rust / compiler | `&mut self` | `Result<Vec<Statement>, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1114`](../../compiler/crates/aic-ir/src/lib.rs:1114) |
-| [ ] | `statement` | Rust / compiler | `&mut self` | `Result<Statement, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1130`](../../compiler/crates/aic-ir/src/lib.rs:1130) |
-| [ ] | `preference_statement` | Rust / compiler | `&mut self` | `Result<StatementKind, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1376`](../../compiler/crates/aic-ir/src/lib.rs:1376) |
-| [ ] | `database_statement` | Rust / compiler | `&mut self` | `Result<StatementKind, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1387`](../../compiler/crates/aic-ir/src/lib.rs:1387) |
-| [ ] | `named_values` | Rust / compiler | `&mut self) -> Result<Vec<(String, Expression` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:1413`](../../compiler/crates/aic-ir/src/lib.rs:1413) |
-| [ ] | `android` | Rust / compiler | `&mut self` | `Result<StatementKind, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1426`](../../compiler/crates/aic-ir/src/lib.rs:1426) |
-| [ ] | `layout_size` | Rust / compiler | `&mut self` | `Result<LayoutSize, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1742`](../../compiler/crates/aic-ir/src/lib.rs:1742) |
-| [ ] | `expr` | Rust / compiler | `&mut self, min: u8` | `Result<Expression, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1755`](../../compiler/crates/aic-ir/src/lib.rs:1755) |
-| [ ] | `prefix` | Rust / compiler | `&mut self` | `Result<Expression, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1781`](../../compiler/crates/aic-ir/src/lib.rs:1781) |
-| [ ] | `valid_color` | Rust / compiler | `value: &str` | `bool` | [`compiler/crates/aic-ir/src/lib.rs:1927`](../../compiler/crates/aic-ir/src/lib.rs:1927) |
-| [ ] | `keyword` | Rust / compiler | `v: &str` | `bool` | [`compiler/crates/aic-ir/src/lib.rs:1932`](../../compiler/crates/aic-ir/src/lib.rs:1932) |
-| [ ] | `bin` | Rust / compiler | `k: &K) -> Option<(BinaryOp, u8` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:1963`](../../compiler/crates/aic-ir/src/lib.rs:1963) |
-| [ ] | `validate_navigation` | Rust / compiler | `body: &mut [Statement], activities: &BTreeSet<String>, package: &str, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:2095`](../../compiler/crates/aic-ir/src/lib.rs:2095) |
-| [ ] | `validate_constant_view_states` | Rust / compiler | `body: &[Statement]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:2137`](../../compiler/crates/aic-ir/src/lib.rs:2137) |
-| [ ] | `verify_one` | Rust / compiler | `s: SyntaxProgram, enforce_unused_capabilities: bool` | `Result<Program, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2187`](../../compiler/crates/aic-ir/src/lib.rs:2187) |
-| [ ] | `stmts` | Rust / compiler | `&mut self, b: &[Statement], e: &mut BTreeMap<String, Binding>,` | `Result<bool, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2769`](../../compiler/crates/aic-ir/src/lib.rs:2769) |
-| [ ] | `stmt` | Rust / compiler | `&mut self, s: &Statement, e: &mut BTreeMap<String, Binding>,` | `Result<bool, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2783`](../../compiler/crates/aic-ir/src/lib.rs:2783) |
-| [ ] | `expr` | Rust / compiler | `&mut self, x: &Expression, e: &BTreeMap<String, Binding>` | `Result<Type, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:3201`](../../compiler/crates/aic-ir/src/lib.rs:3201) |
-| [ ] | `verify_database_read` | Rust / compiler | `&mut self, table: &str, id: &Expression, e: &BTreeMap<String, Binding>, span: SourceSpan,` | `Result<BTreeMap<String, Column>, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:3359`](../../compiler/crates/aic-ir/src/lib.rs:3359) |
-| [ ] | `verify_database_write` | Rust / compiler | `&mut self, table: &str, id: Option<&Expression>, values: &[(String, Expression)], e: &BTreeMap<String, Binding>, span: SourceSpan, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3382`](../../compiler/crates/aic-ir/src/lib.rs:3382) |
-| [ ] | `req` | Rust / compiler | `a: Type, b: Type, s: SourceSpan) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3442`](../../compiler/crates/aic-ir/src/lib.rs:3442) |
-| [ ] | `view` | Rust / compiler | `e: &BTreeMap<String, Binding>, n: &str, s: SourceSpan) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3453`](../../compiler/crates/aic-ir/src/lib.rs:3453) |
-| [ ] | `cycles` | Rust / compiler | `g: &BTreeMap<String, BTreeSet<String>>) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3464`](../../compiler/crates/aic-ir/src/lib.rs:3464) |
-| [ ] | `go` | Rust / compiler | `n: &str, g: &BTreeMap<String, BTreeSet<String>>, a: &mut BTreeSet<String>, d: &mut BTreeSet<String>,` | `bool` | [`compiler/crates/aic-ir/src/lib.rs:3465`](../../compiler/crates/aic-ir/src/lib.rs:3465) |
-| [ ] | `eval` | Rust / compiler | `x: &Expression, e: &BTreeMap<String, Value>, p: &Program` | `Result<Value, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:3514`](../../compiler/crates/aic-ir/src/lib.rs:3514) |
-| [ ] | `run` | Rust / compiler | `b: &[Statement], e: &mut BTreeMap<String, Value>, p: &Program,` | `Result<Option<Value>, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:3574`](../../compiler/crates/aic-ir/src/lib.rs:3574) |
-| [ ] | `value` | Rust / compiler | `op: BinaryOp, l: Value, r: Value, s: SourceSpan` | `Result<Value, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:3622`](../../compiler/crates/aic-ir/src/lib.rs:3622) |
-| [ ] | `m1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3653`](../../compiler/crates/aic-ir/src/lib.rs:3653) |
-| [ ] | `m9_version_migration_and_catalog_are_deterministic` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3657`](../../compiler/crates/aic-ir/src/lib.rs:3657) |
-| [ ] | `m9_layout_dimensions_margins_and_containment_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3700`](../../compiler/crates/aic-ir/src/lib.rs:3700) |
-| [ ] | `m9_common_inputs_and_spinner_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3757`](../../compiler/crates/aic-ir/src/lib.rs:3757) |
-| [ ] | `m9_state_backed_collections_and_selection_handlers_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3801`](../../compiler/crates/aic-ir/src/lib.rs:3801) |
-| [ ] | `m9_collection_and_selection_diagnostics_are_stable` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3818`](../../compiler/crates/aic-ir/src/lib.rs:3818) |
-| [ ] | `m9_bounded_scale_safe_text_sizes_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3851`](../../compiler/crates/aic-ir/src/lib.rs:3851) |
-| [ ] | `m9_input_labels_and_semantic_headings_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3894`](../../compiler/crates/aic-ir/src/lib.rs:3894) |
-| [ ] | `m9_minimum_touch_targets_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3937`](../../compiler/crates/aic-ir/src/lib.rs:3937) |
-| [ ] | `m9_accessibility_semantics_and_view_states_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:3969`](../../compiler/crates/aic-ir/src/lib.rs:3969) |
-| [ ] | `m9_literal_color_properties_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4020`](../../compiler/crates/aic-ir/src/lib.rs:4020) |
-| [ ] | `m2` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4069`](../../compiler/crates/aic-ir/src/lib.rs:4069) |
-| [ ] | `precedence` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4076`](../../compiler/crates/aic-ir/src/lib.rs:4076) |
-| [ ] | `immutable` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4081`](../../compiler/crates/aic-ir/src/lib.rs:4081) |
-| [ ] | `descriptor` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4090`](../../compiler/crates/aic-ir/src/lib.rs:4090) |
-| [ ] | `rejects_type_and_symbol_errors_with_locations` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4094`](../../compiler/crates/aic-ir/src/lib.rs:4094) |
-| [ ] | `rejects_missing_return_and_static_zero_divisor` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4104`](../../compiler/crates/aic-ir/src/lib.rs:4104) |
-| [ ] | `preserves_m1_view_diagnostics` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4119`](../../compiler/crates/aic-ir/src/lib.rs:4119) |
-| [ ] | `m3_state_widgets_and_handlers_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4134`](../../compiler/crates/aic-ir/src/lib.rs:4134) |
-| [ ] | `m3_rejects_non_button_handler_and_bad_orientation` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4140`](../../compiler/crates/aic-ir/src/lib.rs:4140) |
-| [ ] | `m4_typed_persistence_verifies` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4171`](../../compiler/crates/aic-ir/src/lib.rs:4171) |
-| [ ] | `m4_rejects_capability_and_schema_errors` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4178`](../../compiler/crates/aic-ir/src/lib.rs:4178) |
-| [ ] | `failure` | Rust / compiler | `stage: &str, code: &str, message: &str` | `String` | [`compiler/crates/aic-jni/src/lib.rs:69`](../../compiler/crates/aic-jni/src/lib.rs:69) |
-| [ ] | `adapter_writes_identical_artifacts_and_preserves_errors` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-jni/src/lib.rs:122`](../../compiler/crates/aic-jni/src/lib.rs:122) |
-| [ ] | `roots` | Rust / compiler | `p: &Program, r: &mut Reachability` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:115`](../../compiler/crates/aic-opt/src/lib.rs:115) |
-| [ ] | `reachable_functions` | Rust / compiler | `p: &Program` | `BTreeSet<String>` | [`compiler/crates/aic-opt/src/lib.rs:129`](../../compiler/crates/aic-opt/src/lib.rs:129) |
-| [ ] | `statements` | Rust / compiler | `body: Vec<Statement>` | `Vec<Statement>` | [`compiler/crates/aic-opt/src/lib.rs:148`](../../compiler/crates/aic-opt/src/lib.rs:148) |
-| [ ] | `terminal` | Rust / compiler | `s: &Statement` | `bool` | [`compiler/crates/aic-opt/src/lib.rs:249`](../../compiler/crates/aic-opt/src/lib.rs:249) |
-| [ ] | `expression` | Rust / compiler | `mut e: Expression` | `Expression` | [`compiler/crates/aic-opt/src/lib.rs:266`](../../compiler/crates/aic-opt/src/lib.rs:266) |
-| [ ] | `inspect_statements` | Rust / compiler | `xs: &[Statement], r: &mut Reachability` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:330`](../../compiler/crates/aic-opt/src/lib.rs:330) |
-| [ ] | `database_values` | Rust / compiler | `table: &str, values: &[(String, Expression)], r: &mut Reachability` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:436`](../../compiler/crates/aic-opt/src/lib.rs:436) |
-| [ ] | `inspect_expression` | Rust / compiler | `e: &Expression, r: &mut Reachability` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:444`](../../compiler/crates/aic-opt/src/lib.rs:444) |
-| [ ] | `fold_unary` | Rust / compiler | `op: UnaryOp, v: &ExpressionKind` | `Option<Value>` | [`compiler/crates/aic-opt/src/lib.rs:489`](../../compiler/crates/aic-opt/src/lib.rs:489) |
-| [ ] | `fold_binary` | Rust / compiler | `op: BinaryOp, l: &ExpressionKind, r: &ExpressionKind` | `Option<Value>` | [`compiler/crates/aic-opt/src/lib.rs:498`](../../compiler/crates/aic-opt/src/lib.rs:498) |
-| [ ] | `differential_reachability` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:532`](../../compiler/crates/aic-opt/src/lib.rs:532) |
-| [ ] | `o0_identity_and_deterministic_report` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:547`](../../compiler/crates/aic-opt/src/lib.rs:547) |
-| [ ] | `m9_text_sizes_survive_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:560`](../../compiler/crates/aic-opt/src/lib.rs:560) |
-| [ ] | `m9_literal_colors_survive_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:581`](../../compiler/crates/aic-opt/src/lib.rs:581) |
-| [ ] | `m9_touch_target_controls_survive_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:609`](../../compiler/crates/aic-opt/src/lib.rs:609) |
-| [ ] | `folds_away_and_prunes_dead_persistence_resources` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:659`](../../compiler/crates/aic-opt/src/lib.rs:659) |
-| [ ] | `supported_evaluator_corpus_is_differential` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:669`](../../compiler/crates/aic-opt/src/lib.rs:669) |
-| [ ] | `fmt` | Rust / compiler | `&self, f: &mut std::fmt::Formatter<'_>` | `std::fmt::Result` | [`compiler/crates/aic-res/src/lib.rs:18`](../../compiler/crates/aic-res/src/lib.rs:18) |
-| [ ] | `from` | Rust / compiler | `_: std::num::TryFromIntError` | `Self` | [`compiler/crates/aic-res/src/lib.rs:24`](../../compiler/crates/aic-res/src/lib.rs:24) |
-| [ ] | `attr` | Rust / compiler | `name: &'static str, value: &str, kind: u8, data: u32` | `Attribute` | [`compiler/crates/aic-res/src/lib.rs:41`](../../compiler/crates/aic-res/src/lib.rs:41) |
-| [ ] | `element` | Rust / compiler | `name: &'static str, attrs: Vec<Attribute>, children: Vec<Element>` | `Element` | [`compiler/crates/aic-res/src/lib.rs:50`](../../compiler/crates/aic-res/src/lib.rs:50) |
-| [ ] | `escape` | Rust / compiler | `s: &str` | `String` | [`compiler/crates/aic-res/src/lib.rs:138`](../../compiler/crates/aic-res/src/lib.rs:138) |
-| [ ] | `emit` | Rust / compiler | `e: &Element, depth: usize, out: &mut String` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:147`](../../compiler/crates/aic-res/src/lib.rs:147) |
-| [ ] | `word` | Rust / compiler | `out: &mut Vec<u8>, n: u32` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:195`](../../compiler/crates/aic-res/src/lib.rs:195) |
-| [ ] | `short` | Rust / compiler | `out: &mut Vec<u8>, n: u16` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:198`](../../compiler/crates/aic-res/src/lib.rs:198) |
-| [ ] | `chunk` | Rust / compiler | `kind: u16, header: u16, body: Vec<u8>` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:201`](../../compiler/crates/aic-res/src/lib.rs:201) |
-| [ ] | `chunk_size` | Rust / compiler | `payload: usize` | `Result<u32, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:210`](../../compiler/crates/aic-res/src/lib.rs:210) |
-| [ ] | `intern` | Rust / compiler | `strings: &mut Vec<String>, s: &str) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:217`](../../compiler/crates/aic-res/src/lib.rs:217) |
-| [ ] | `index` | Rust / compiler | `strings: &[String], s: &str` | `Result<u32, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:224`](../../compiler/crates/aic-res/src/lib.rs:224) |
-| [ ] | `collect` | Rust / compiler | `e: &Element, strings: &mut Vec<String>) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:233`](../../compiler/crates/aic-res/src/lib.rs:233) |
-| [ ] | `string_pool` | Rust / compiler | `strings: &[String]` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:249`](../../compiler/crates/aic-res/src/lib.rs:249) |
-| [ ] | `node` | Rust / compiler | `-` | `Vec<u8>` | [`compiler/crates/aic-res/src/lib.rs:290`](../../compiler/crates/aic-res/src/lib.rs:290) |
-| [ ] | `namespace` | Rust / compiler | `kind: u16, strings: &[String]` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:296`](../../compiler/crates/aic-res/src/lib.rs:296) |
-| [ ] | `emit_binary` | Rust / compiler | `e: &Element, strings: &[String], out: &mut Vec<u8>) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:302`](../../compiler/crates/aic-res/src/lib.rs:302) |
-| [ ] | `limits_invalid_xml_and_typed_attributes` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:354`](../../compiler/crates/aic-res/src/lib.rs:354) |
-| [ ] | `unicode_boundaries_and_chunk_layout` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:406`](../../compiler/crates/aic-res/src/lib.rs:406) |
+| [ ] | `lex` | Rust / compiler | `src: &str` | `Result<Vec<Tok>, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:638`](../../compiler/crates/aic-ir/src/lib.rs:638) |
+| [ ] | `cur` | Rust / compiler | `&self` | `&Tok` | [`compiler/crates/aic-ir/src/lib.rs:850`](../../compiler/crates/aic-ir/src/lib.rs:850) |
+| [ ] | `pop` | Rust / compiler | `&mut self` | `Tok` | [`compiler/crates/aic-ir/src/lib.rs:853`](../../compiler/crates/aic-ir/src/lib.rs:853) |
+| [ ] | `word` | Rust / compiler | `&mut self, w: &str` | `Result<Tok, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:858`](../../compiler/crates/aic-ir/src/lib.rs:858) |
+| [ ] | `sym` | Rust / compiler | `&mut self, w: &'static str` | `Result<Tok, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:866`](../../compiler/crates/aic-ir/src/lib.rs:866) |
+| [ ] | `id` | Rust / compiler | `&mut self) -> Result<(String, SourceSpan` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:874`](../../compiler/crates/aic-ir/src/lib.rs:874) |
+| [ ] | `string` | Rust / compiler | `&mut self` | `Result<String, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:883`](../../compiler/crates/aic-ir/src/lib.rs:883) |
+| [ ] | `program` | Rust / compiler | `mut self` | `Result<SyntaxProgram, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:891`](../../compiler/crates/aic-ir/src/lib.rs:891) |
+| [ ] | `activity` | Rust / compiler | `&mut self` | `Result<SyntaxActivity, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1182`](../../compiler/crates/aic-ir/src/lib.rs:1182) |
+| [ ] | `database` | Rust / compiler | `&mut self` | `Result<Database, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1335`](../../compiler/crates/aic-ir/src/lib.rs:1335) |
+| [ ] | `function` | Rust / compiler | `&mut self` | `Result<SyntaxFunction, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1392`](../../compiler/crates/aic-ir/src/lib.rs:1392) |
+| [ ] | `ty` | Rust / compiler | `&mut self` | `Result<Type, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1426`](../../compiler/crates/aic-ir/src/lib.rs:1426) |
+| [ ] | `block` | Rust / compiler | `&mut self` | `Result<Vec<Statement>, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1439`](../../compiler/crates/aic-ir/src/lib.rs:1439) |
+| [ ] | `statement` | Rust / compiler | `&mut self` | `Result<Statement, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1455`](../../compiler/crates/aic-ir/src/lib.rs:1455) |
+| [ ] | `preference_statement` | Rust / compiler | `&mut self` | `Result<StatementKind, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1719`](../../compiler/crates/aic-ir/src/lib.rs:1719) |
+| [ ] | `database_statement` | Rust / compiler | `&mut self` | `Result<StatementKind, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1730`](../../compiler/crates/aic-ir/src/lib.rs:1730) |
+| [ ] | `named_values` | Rust / compiler | `&mut self) -> Result<Vec<(String, Expression` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:1756`](../../compiler/crates/aic-ir/src/lib.rs:1756) |
+| [ ] | `android` | Rust / compiler | `&mut self` | `Result<StatementKind, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1769`](../../compiler/crates/aic-ir/src/lib.rs:1769) |
+| [ ] | `layout_size` | Rust / compiler | `&mut self` | `Result<LayoutSize, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2100`](../../compiler/crates/aic-ir/src/lib.rs:2100) |
+| [ ] | `expr` | Rust / compiler | `&mut self, min: u8` | `Result<Expression, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2113`](../../compiler/crates/aic-ir/src/lib.rs:2113) |
+| [ ] | `prefix` | Rust / compiler | `&mut self` | `Result<Expression, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2139`](../../compiler/crates/aic-ir/src/lib.rs:2139) |
+| [ ] | `valid_color` | Rust / compiler | `value: &str` | `bool` | [`compiler/crates/aic-ir/src/lib.rs:2317`](../../compiler/crates/aic-ir/src/lib.rs:2317) |
+| [ ] | `keyword` | Rust / compiler | `v: &str` | `bool` | [`compiler/crates/aic-ir/src/lib.rs:2322`](../../compiler/crates/aic-ir/src/lib.rs:2322) |
+| [ ] | `bin` | Rust / compiler | `k: &K) -> Option<(BinaryOp, u8` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:2359`](../../compiler/crates/aic-ir/src/lib.rs:2359) |
+| [ ] | `validate_resource_usage` | Rust / compiler | `program: &SyntaxProgram) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:2648`](../../compiler/crates/aic-ir/src/lib.rs:2648) |
+| [ ] | `expression` | Rust / compiler | `value: &Expression, strings: &mut BTreeSet<String>, colors: &mut BTreeSet<String>,` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:2649`](../../compiler/crates/aic-ir/src/lib.rs:2649) |
+| [ ] | `statements` | Rust / compiler | `body: &[Statement], strings: &mut BTreeSet<String>, colors: &mut BTreeSet<String>, images: &mut BTreeSet<String>,` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:2684`](../../compiler/crates/aic-ir/src/lib.rs:2684) |
+| [ ] | `validate_navigation` | Rust / compiler | `body: &mut [Statement], activities: &BTreeSet<String>, package: &str, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:2825`](../../compiler/crates/aic-ir/src/lib.rs:2825) |
+| [ ] | `validate_constant_view_states` | Rust / compiler | `body: &[Statement]) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:2867`](../../compiler/crates/aic-ir/src/lib.rs:2867) |
+| [ ] | `verify_one` | Rust / compiler | `s: SyntaxProgram, enforce_unused_capabilities: bool` | `Result<Program, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2917`](../../compiler/crates/aic-ir/src/lib.rs:2917) |
+| [ ] | `valid_canonical_locale` | Rust / compiler | `locale: &str` | `bool` | [`compiler/crates/aic-ir/src/lib.rs:3652`](../../compiler/crates/aic-ir/src/lib.rs:3652) |
+| [ ] | `stmts` | Rust / compiler | `&mut self, b: &[Statement], e: &mut BTreeMap<String, Binding>,` | `Result<bool, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:3683`](../../compiler/crates/aic-ir/src/lib.rs:3683) |
+| [ ] | `stmt` | Rust / compiler | `&mut self, s: &Statement, e: &mut BTreeMap<String, Binding>,` | `Result<bool, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:3697`](../../compiler/crates/aic-ir/src/lib.rs:3697) |
+| [ ] | `expr` | Rust / compiler | `&mut self, x: &Expression, e: &BTreeMap<String, Binding>` | `Result<Type, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:4148`](../../compiler/crates/aic-ir/src/lib.rs:4148) |
+| [ ] | `verify_database_read` | Rust / compiler | `&mut self, table: &str, id: &Expression, e: &BTreeMap<String, Binding>, span: SourceSpan,` | `Result<BTreeMap<String, Column>, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:4342`](../../compiler/crates/aic-ir/src/lib.rs:4342) |
+| [ ] | `verify_database_write` | Rust / compiler | `&mut self, table: &str, id: Option<&Expression>, values: &[(String, Expression)], e: &BTreeMap<String, Binding>, span: SourceSpan, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4365`](../../compiler/crates/aic-ir/src/lib.rs:4365) |
+| [ ] | `req` | Rust / compiler | `a: Type, b: Type, s: SourceSpan) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4425`](../../compiler/crates/aic-ir/src/lib.rs:4425) |
+| [ ] | `view` | Rust / compiler | `e: &BTreeMap<String, Binding>, n: &str, s: SourceSpan) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4436`](../../compiler/crates/aic-ir/src/lib.rs:4436) |
+| [ ] | `cycles` | Rust / compiler | `g: &BTreeMap<String, BTreeSet<String>>) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4447`](../../compiler/crates/aic-ir/src/lib.rs:4447) |
+| [ ] | `go` | Rust / compiler | `n: &str, g: &BTreeMap<String, BTreeSet<String>>, a: &mut BTreeSet<String>, d: &mut BTreeSet<String>,` | `bool` | [`compiler/crates/aic-ir/src/lib.rs:4448`](../../compiler/crates/aic-ir/src/lib.rs:4448) |
+| [ ] | `eval` | Rust / compiler | `x: &Expression, e: &BTreeMap<String, Value>, p: &Program` | `Result<Value, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:4497`](../../compiler/crates/aic-ir/src/lib.rs:4497) |
+| [ ] | `run` | Rust / compiler | `b: &[Statement], e: &mut BTreeMap<String, Value>, p: &Program,` | `Result<Option<Value>, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:4572`](../../compiler/crates/aic-ir/src/lib.rs:4572) |
+| [ ] | `value` | Rust / compiler | `op: BinaryOp, l: Value, r: Value, s: SourceSpan` | `Result<Value, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:4620`](../../compiler/crates/aic-ir/src/lib.rs:4620) |
+| [ ] | `m1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4651`](../../compiler/crates/aic-ir/src/lib.rs:4651) |
+| [ ] | `m9_version_migration_and_catalog_are_deterministic` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4655`](../../compiler/crates/aic-ir/src/lib.rs:4655) |
+| [ ] | `m9_supported_ui_catalog_has_complete_evidence_inventory` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4698`](../../compiler/crates/aic-ir/src/lib.rs:4698) |
+| [ ] | `m9_declared_ui_variants_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4728`](../../compiler/crates/aic-ir/src/lib.rs:4728) |
+| [ ] | `m9_layout_dimensions_margins_and_containment_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4819`](../../compiler/crates/aic-ir/src/lib.rs:4819) |
+| [ ] | `m9_common_inputs_and_spinner_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4876`](../../compiler/crates/aic-ir/src/lib.rs:4876) |
+| [ ] | `m9_state_backed_collections_and_selection_handlers_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4920`](../../compiler/crates/aic-ir/src/lib.rs:4920) |
+| [ ] | `m9_collection_and_selection_diagnostics_are_stable` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4937`](../../compiler/crates/aic-ir/src/lib.rs:4937) |
+| [ ] | `m9_bounded_scale_safe_text_sizes_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:4970`](../../compiler/crates/aic-ir/src/lib.rs:4970) |
+| [ ] | `m9_input_labels_and_semantic_headings_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5013`](../../compiler/crates/aic-ir/src/lib.rs:5013) |
+| [ ] | `m9_minimum_touch_targets_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5056`](../../compiler/crates/aic-ir/src/lib.rs:5056) |
+| [ ] | `m9_accessibility_semantics_and_view_states_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5088`](../../compiler/crates/aic-ir/src/lib.rs:5088) |
+| [ ] | `m9_literal_color_properties_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5139`](../../compiler/crates/aic-ir/src/lib.rs:5139) |
+| [ ] | `m9_canonical_string_resources_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5188`](../../compiler/crates/aic-ir/src/lib.rs:5188) |
+| [ ] | `m9_typed_resource_surface_and_invalid_fixtures` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5240`](../../compiler/crates/aic-ir/src/lib.rs:5240) |
+| [ ] | `m9_supported_resource_catalog_has_complete_evidence_inventory` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5279`](../../compiler/crates/aic-ir/src/lib.rs:5279) |
+| [ ] | `m2` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5297`](../../compiler/crates/aic-ir/src/lib.rs:5297) |
+| [ ] | `precedence` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5304`](../../compiler/crates/aic-ir/src/lib.rs:5304) |
+| [ ] | `immutable` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5309`](../../compiler/crates/aic-ir/src/lib.rs:5309) |
+| [ ] | `descriptor` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5318`](../../compiler/crates/aic-ir/src/lib.rs:5318) |
+| [ ] | `rejects_type_and_symbol_errors_with_locations` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5322`](../../compiler/crates/aic-ir/src/lib.rs:5322) |
+| [ ] | `rejects_missing_return_and_static_zero_divisor` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5332`](../../compiler/crates/aic-ir/src/lib.rs:5332) |
+| [ ] | `preserves_m1_view_diagnostics` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5347`](../../compiler/crates/aic-ir/src/lib.rs:5347) |
+| [ ] | `m3_state_widgets_and_handlers_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5362`](../../compiler/crates/aic-ir/src/lib.rs:5362) |
+| [ ] | `m3_rejects_non_button_handler_and_bad_orientation` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5368`](../../compiler/crates/aic-ir/src/lib.rs:5368) |
+| [ ] | `m4_typed_persistence_verifies` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5399`](../../compiler/crates/aic-ir/src/lib.rs:5399) |
+| [ ] | `m4_rejects_capability_and_schema_errors` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5406`](../../compiler/crates/aic-ir/src/lib.rs:5406) |
+| [ ] | `m9_adaptive_variants_verify` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-ir/src/lib.rs:5434`](../../compiler/crates/aic-ir/src/lib.rs:5434) |
+| [ ] | `read_assets` | Rust / compiler | `directory: &Path` | `std::io::Result<Vec<aic_build::ProjectAsset>>` | [`compiler/crates/aic-jni/src/lib.rs:91`](../../compiler/crates/aic-jni/src/lib.rs:91) |
+| [ ] | `failure` | Rust / compiler | `stage: &str, code: &str, message: &str` | `String` | [`compiler/crates/aic-jni/src/lib.rs:117`](../../compiler/crates/aic-jni/src/lib.rs:117) |
+| [ ] | `adapter_writes_identical_artifacts_and_preserves_errors` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-jni/src/lib.rs:179`](../../compiler/crates/aic-jni/src/lib.rs:179) |
+| [ ] | `roots` | Rust / compiler | `p: &Program, r: &mut Reachability` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:118`](../../compiler/crates/aic-opt/src/lib.rs:118) |
+| [ ] | `reachable_functions` | Rust / compiler | `p: &Program` | `BTreeSet<String>` | [`compiler/crates/aic-opt/src/lib.rs:144`](../../compiler/crates/aic-opt/src/lib.rs:144) |
+| [ ] | `statements` | Rust / compiler | `body: Vec<Statement>` | `Vec<Statement>` | [`compiler/crates/aic-opt/src/lib.rs:163`](../../compiler/crates/aic-opt/src/lib.rs:163) |
+| [ ] | `terminal` | Rust / compiler | `s: &Statement` | `bool` | [`compiler/crates/aic-opt/src/lib.rs:264`](../../compiler/crates/aic-opt/src/lib.rs:264) |
+| [ ] | `expression` | Rust / compiler | `mut e: Expression` | `Expression` | [`compiler/crates/aic-opt/src/lib.rs:281`](../../compiler/crates/aic-opt/src/lib.rs:281) |
+| [ ] | `inspect_statements` | Rust / compiler | `xs: &[Statement], r: &mut Reachability` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:345`](../../compiler/crates/aic-opt/src/lib.rs:345) |
+| [ ] | `database_values` | Rust / compiler | `table: &str, values: &[(String, Expression)], r: &mut Reachability` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:453`](../../compiler/crates/aic-opt/src/lib.rs:453) |
+| [ ] | `inspect_expression` | Rust / compiler | `e: &Expression, r: &mut Reachability` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:461`](../../compiler/crates/aic-opt/src/lib.rs:461) |
+| [ ] | `fold_unary` | Rust / compiler | `op: UnaryOp, v: &ExpressionKind` | `Option<Value>` | [`compiler/crates/aic-opt/src/lib.rs:509`](../../compiler/crates/aic-opt/src/lib.rs:509) |
+| [ ] | `fold_binary` | Rust / compiler | `op: BinaryOp, l: &ExpressionKind, r: &ExpressionKind` | `Option<Value>` | [`compiler/crates/aic-opt/src/lib.rs:518`](../../compiler/crates/aic-opt/src/lib.rs:518) |
+| [ ] | `differential_reachability` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:552`](../../compiler/crates/aic-opt/src/lib.rs:552) |
+| [ ] | `o0_identity_and_deterministic_report` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:567`](../../compiler/crates/aic-opt/src/lib.rs:567) |
+| [ ] | `m9_text_sizes_survive_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:580`](../../compiler/crates/aic-opt/src/lib.rs:580) |
+| [ ] | `m9_literal_colors_survive_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:601`](../../compiler/crates/aic-opt/src/lib.rs:601) |
+| [ ] | `m9_touch_target_controls_survive_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:629`](../../compiler/crates/aic-opt/src/lib.rs:629) |
+| [ ] | `m9_declared_ui_surface_survives_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:679`](../../compiler/crates/aic-opt/src/lib.rs:679) |
+| [ ] | `m9_typed_resources_survive_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:713`](../../compiler/crates/aic-opt/src/lib.rs:713) |
+| [ ] | `folds_away_and_prunes_dead_persistence_resources` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:740`](../../compiler/crates/aic-opt/src/lib.rs:740) |
+| [ ] | `m9_adaptive_variants_survive_o0_and_o1` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:750`](../../compiler/crates/aic-opt/src/lib.rs:750) |
+| [ ] | `supported_evaluator_corpus_is_differential` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-opt/src/lib.rs:774`](../../compiler/crates/aic-opt/src/lib.rs:774) |
+| [ ] | `fmt` | Rust / compiler | `&self, f: &mut std::fmt::Formatter<'_>` | `std::fmt::Result` | [`compiler/crates/aic-res/src/lib.rs:20`](../../compiler/crates/aic-res/src/lib.rs:20) |
+| [ ] | `from` | Rust / compiler | `_: std::num::TryFromIntError` | `Self` | [`compiler/crates/aic-res/src/lib.rs:26`](../../compiler/crates/aic-res/src/lib.rs:26) |
+| [ ] | `resource_table` | Rust / compiler | `package_name: &str, strings: &[StringValue], colors: &[(String, u32)], files: &[FileResource], theme: Option<(&str, u32, u32)>, ids: &ResourceIds,` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:234`](../../compiler/crates/aic-res/src/lib.rs:234) |
+| [ ] | `emit_type_group` | Rust / compiler | `out: &mut Vec<u8>, type_id: u8, entry_count: usize, keys: &[String], configurations: BTreeMap<Option<String>, Vec<TableEntry>>, ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:370`](../../compiler/crates/aic-res/src/lib.rs:370) |
+| [ ] | `type_chunk` | Rust / compiler | `type_id: u8, names: &[String], keys: &[String], locale: Option<&str>, entries: &[TableEntry],` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:415`](../../compiler/crates/aic-res/src/lib.rs:415) |
+| [ ] | `emit_style_type` | Rust / compiler | `out: &mut Vec<u8>, name: &str, primary: u32, accent: u32, keys: &[String], ) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:461`](../../compiler/crates/aic-res/src/lib.rs:461) |
+| [ ] | `resource_config` | Rust / compiler | `locale: Option<&str>` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:502`](../../compiler/crates/aic-res/src/lib.rs:502) |
+| [ ] | `pack_locale_part` | Rust / compiler | `part: &str, base: u8` | `Result<[u8` | [`compiler/crates/aic-res/src/lib.rs:524`](../../compiler/crates/aic-res/src/lib.rs:524) |
+| [ ] | `color_data_type` | Rust / compiler | `color: u32` | `u8` | [`compiler/crates/aic-res/src/lib.rs:538`](../../compiler/crates/aic-res/src/lib.rs:538) |
+| [ ] | `attr` | Rust / compiler | `name: &'static str, value: &str, kind: u8, data: u32` | `Attribute` | [`compiler/crates/aic-res/src/lib.rs:558`](../../compiler/crates/aic-res/src/lib.rs:558) |
+| [ ] | `element` | Rust / compiler | `name: &'static str, attrs: Vec<Attribute>, children: Vec<Element>` | `Element` | [`compiler/crates/aic-res/src/lib.rs:567`](../../compiler/crates/aic-res/src/lib.rs:567) |
+| [ ] | `escape` | Rust / compiler | `s: &str` | `String` | [`compiler/crates/aic-res/src/lib.rs:673`](../../compiler/crates/aic-res/src/lib.rs:673) |
+| [ ] | `emit` | Rust / compiler | `e: &Element, depth: usize, out: &mut String` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:682`](../../compiler/crates/aic-res/src/lib.rs:682) |
+| [ ] | `word` | Rust / compiler | `out: &mut Vec<u8>, n: u32` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:730`](../../compiler/crates/aic-res/src/lib.rs:730) |
+| [ ] | `short` | Rust / compiler | `out: &mut Vec<u8>, n: u16` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:733`](../../compiler/crates/aic-res/src/lib.rs:733) |
+| [ ] | `chunk` | Rust / compiler | `kind: u16, header: u16, body: Vec<u8>` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:736`](../../compiler/crates/aic-res/src/lib.rs:736) |
+| [ ] | `chunk_size` | Rust / compiler | `payload: usize` | `Result<u32, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:745`](../../compiler/crates/aic-res/src/lib.rs:745) |
+| [ ] | `intern` | Rust / compiler | `strings: &mut Vec<String>, s: &str) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:752`](../../compiler/crates/aic-res/src/lib.rs:752) |
+| [ ] | `index` | Rust / compiler | `strings: &[String], s: &str` | `Result<u32, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:759`](../../compiler/crates/aic-res/src/lib.rs:759) |
+| [ ] | `collect` | Rust / compiler | `e: &Element, strings: &mut Vec<String>) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:768`](../../compiler/crates/aic-res/src/lib.rs:768) |
+| [ ] | `string_pool` | Rust / compiler | `strings: &[String]` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:784`](../../compiler/crates/aic-res/src/lib.rs:784) |
+| [ ] | `node` | Rust / compiler | `-` | `Vec<u8>` | [`compiler/crates/aic-res/src/lib.rs:825`](../../compiler/crates/aic-res/src/lib.rs:825) |
+| [ ] | `namespace` | Rust / compiler | `kind: u16, strings: &[String]` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:831`](../../compiler/crates/aic-res/src/lib.rs:831) |
+| [ ] | `emit_binary` | Rust / compiler | `e: &Element, strings: &[String], out: &mut Vec<u8>) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:837`](../../compiler/crates/aic-res/src/lib.rs:837) |
+| [ ] | `application_string_ids_are_stable_and_order_independent` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:889`](../../compiler/crates/aic-res/src/lib.rs:889) |
+| [ ] | `bounded_resource_package_is_reproducible` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:906`](../../compiler/crates/aic-res/src/lib.rs:906) |
+| [ ] | `limits_invalid_xml_and_typed_attributes` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:958`](../../compiler/crates/aic-res/src/lib.rs:958) |
+| [ ] | `unicode_boundaries_and_chunk_layout` | Rust / compiler | `-` | `implicit/unit` | [`compiler/crates/aic-res/src/lib.rs:1011`](../../compiler/crates/aic-res/src/lib.rs:1011) |
 | [ ] | `append` | Kotlin / host | `message: String) { log=(log+"\n"+message).takeLast(65536); prefs.edit().putString("log",log).apply(); changed?.invoke(` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/BuildController.kt:65`](../../host/app/src/main/java/dev/aic/host/BuildController.kt:65) |
-| [ ] | `checked` | Kotlin / host | `json: String` | `JSONObject` | [`host/app/src/main/java/dev/aic/host/BuildPipeline.kt:31`](../../host/app/src/main/java/dev/aic/host/BuildPipeline.kt:31) |
+| [ ] | `build` | Kotlin / host | `source: String, level: Int, directory: File, assets: File, progress: (String) -> Unit` | `BuiltApp` | [`host/app/src/main/java/dev/aic/host/BuildPipeline.kt:20`](../../host/app/src/main/java/dev/aic/host/BuildPipeline.kt:20) |
+| [ ] | `stageAssets` | Kotlin / host | `directory: File, images: Map<String,ByteArray>` | `File` | [`host/app/src/main/java/dev/aic/host/BuildPipeline.kt:40`](../../host/app/src/main/java/dev/aic/host/BuildPipeline.kt:40) |
+| [ ] | `checked` | Kotlin / host | `json: String` | `JSONObject` | [`host/app/src/main/java/dev/aic/host/BuildPipeline.kt:49`](../../host/app/src/main/java/dev/aic/host/BuildPipeline.kt:49) |
 | [ ] | `dp` | Kotlin / host | `value: Int)=(value*resources.displayMetrics.density).toInt(` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/MainActivity.kt:101`](../../host/app/src/main/java/dev/aic/host/MainActivity.kt:101) |
 | [ ] | `about` | Kotlin / host | `-` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/MainActivity.kt:102`](../../host/app/src/main/java/dev/aic/host/MainActivity.kt:102) |
 | [ ] | `data` | Kotlin / host | `): ProjectData?=project?.data?.copy(source=source.text.toString(),optLevel=if(level.isChecked) 1 else 0` | `implicit/unit` | [`host/app/src/main/java/dev/aic/host/MainActivity.kt:108`](../../host/app/src/main/java/dev/aic/host/MainActivity.kt:108) |
@@ -435,31 +483,37 @@ Add native documentation (`///`, KDoc, Python docstring, or PowerShell comment h
 | [ ] | `m9_emits_literal_color_properties_deterministically` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_activity.rs:394`](../../compiler/crates/aic-dex/tests/verify_activity.rs:394) |
 | [ ] | `m9_emits_density_aware_minimum_touch_targets_deterministically` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_activity.rs:428`](../../compiler/crates/aic-dex/tests/verify_activity.rs:428) |
 | [ ] | `m9_emits_input_labels_and_guarded_headings_deterministically` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_activity.rs:462`](../../compiler/crates/aic-dex/tests/verify_activity.rs:462) |
-| [ ] | `m9_emits_accessibility_semantics_deterministically` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_activity.rs:492`](../../compiler/crates/aic-dex/tests/verify_activity.rs:492) |
+| [ ] | `m9_emits_accessibility_semantics_deterministically` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_activity.rs:486`](../../compiler/crates/aic-dex/tests/verify_activity.rs:486) |
+| [ ] | `m9_emits_declared_ui_surface_deterministically` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_activity.rs:518`](../../compiler/crates/aic-dex/tests/verify_activity.rs:518) |
+| [ ] | `m9_emits_direct_typed_resource_calls_deterministically` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_activity.rs:572`](../../compiler/crates/aic-dex/tests/verify_activity.rs:572) |
+| [ ] | `m9_emits_adaptive_dispatch_and_lifecycle` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_activity.rs:599`](../../compiler/crates/aic-dex/tests/verify_activity.rs:599) |
 | [ ] | `u32_at` | Rust / test | `b: &[u8], o: usize` | `u32` | [`compiler/crates/aic-dex/tests/verify_minimal.rs:5`](../../compiler/crates/aic-dex/tests/verify_minimal.rs:5) |
 | [ ] | `generated_fixture_has_a_coherent_independent_structure` | Rust / test | `-` | `implicit/unit` | [`compiler/crates/aic-dex/tests/verify_minimal.rs:10`](../../compiler/crates/aic-dex/tests/verify_minimal.rs:10) |
-| [ ] | `onMain` | Kotlin / test | `action: () -> Unit` | `implicit/unit` | [`host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:140`](../../host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:140) |
-| [ ] | `descendants` | Kotlin / test | `view: View` | `Sequence<View>` | [`host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:145`](../../host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:145) |
+| [ ] | `onMain` | Kotlin / test | `action: () -> Unit` | `implicit/unit` | [`host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:142`](../../host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:142) |
+| [ ] | `descendants` | Kotlin / test | `view: View` | `Sequence<View>` | [`host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:147`](../../host/app/src/androidTest/java/dev/aic/host/HostInstrumentation.kt:147) |
 
 ## Already documented
 
 | Done | Function | Language / role | Parameters | Returns | Location |
 |---|---|---|---|---|---|
-| [x] | `compile_source` | Rust / compiler | `source: &str, options: CompilerOptions,` | `Result<BuildArtifacts, BuildError>` | [`compiler/crates/aic-build/src/lib.rs:41`](../../compiler/crates/aic-build/src/lib.rs:41) |
-| [x] | `assemble_apk` | Rust / compiler | `manifest: &[u8], dex: &[u8]` | `Result<Vec<u8>, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:117`](../../compiler/crates/aic-build/src/lib.rs:117) |
-| [x] | `assemble_apk_files` | Rust / compiler | `manifest: &[u8], dex_files: &[(String, Vec<u8>)],` | `Result<Vec<u8>, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:125`](../../compiler/crates/aic-build/src/lib.rs:125) |
-| [x] | `inject_stored_zip` | Rust / compiler | `base: &[u8], name: &str, data: &[u8]` | `Result<Vec<u8>, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:166`](../../compiler/crates/aic-build/src/lib.rs:166) |
-| [x] | `encode_activity_dex` | Rust / compiler | `program: &Program` | `Result<Vec<u8>, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1719`](../../compiler/crates/aic-dex/src/activity.rs:1719) |
+| [x] | `compile_source` | Rust / compiler | `source: &str, options: CompilerOptions,` | `Result<BuildArtifacts, BuildError>` | [`compiler/crates/aic-build/src/lib.rs:51`](../../compiler/crates/aic-build/src/lib.rs:51) |
+| [x] | `compile_source_with_assets` | Rust / compiler | `source: &str, options: CompilerOptions, assets: &[ProjectAsset],` | `Result<BuildArtifacts, BuildError>` | [`compiler/crates/aic-build/src/lib.rs:62`](../../compiler/crates/aic-build/src/lib.rs:62) |
+| [x] | `assemble_apk` | Rust / compiler | `manifest: &[u8], dex: &[u8]` | `Result<Vec<u8>, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:315`](../../compiler/crates/aic-build/src/lib.rs:315) |
+| [x] | `assemble_apk_files` | Rust / compiler | `manifest: &[u8], dex_files: &[(String, Vec<u8>)],` | `Result<Vec<u8>, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:323`](../../compiler/crates/aic-build/src/lib.rs:323) |
+| [x] | `assemble_apk_resources` | Rust / compiler | `manifest: &[u8], resources: &[u8], resource_entries: &[(String, Vec<u8>)], dex_files: &[(String, Vec<u8>)],` | `Result<Vec<u8>, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:339`](../../compiler/crates/aic-build/src/lib.rs:339) |
+| [x] | `inject_stored_zip` | Rust / compiler | `base: &[u8], name: &str, data: &[u8]` | `Result<Vec<u8>, ZipError>` | [`compiler/crates/aic-build/src/lib.rs:399`](../../compiler/crates/aic-build/src/lib.rs:399) |
+| [x] | `encode_activity_dex` | Rust / compiler | `program: &Program` | `Result<Vec<u8>, DexError>` | [`compiler/crates/aic-dex/src/activity.rs:1870`](../../compiler/crates/aic-dex/src/activity.rs:1870) |
 | [x] | `align` | Rust / compiler | `&mut self, alignment: usize) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/encoding.rs:71`](../../compiler/crates/aic-dex/src/encoding.rs:71) |
 | [x] | `patch_u32` | Rust / compiler | `&mut self, offset: usize, value: u32) -> Result<(` | `implicit/unit` | [`compiler/crates/aic-dex/src/encoding.rs:91`](../../compiler/crates/aic-dex/src/encoding.rs:91) |
 | [x] | `encode_mutf8` | Rust / compiler | `value: &str` | `Vec<u8>` | [`compiler/crates/aic-dex/src/encoding.rs:136`](../../compiler/crates/aic-dex/src/encoding.rs:136) |
 | [x] | `assemble` | Rust / compiler | `instructions: &[Instruction]` | `Result<Vec<u16>, DexError>` | [`compiler/crates/aic-dex/src/lir.rs:263`](../../compiler/crates/aic-dex/src/lir.rs:263) |
 | [x] | `encode_minimal_dex` | Rust / compiler | `class: &MinimalClass` | `Result<Vec<u8>, DexError>` | [`compiler/crates/aic-dex/src/writer.rs:173`](../../compiler/crates/aic-dex/src/writer.rs:173) |
-| [x] | `migrate_source` | Rust / compiler | `source: &str` | `Result<String, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:1995`](../../compiler/crates/aic-ir/src/lib.rs:1995) |
-| [x] | `capability_catalog` | Rust / compiler | `-` | `&'static str` | [`compiler/crates/aic-ir/src/lib.rs:2018`](../../compiler/crates/aic-ir/src/lib.rs:2018) |
-| [x] | `compile_request` | Rust / compiler | `source: &str, output: &Path, level: i32` | `String` | [`compiler/crates/aic-jni/src/lib.rs:13`](../../compiler/crates/aic-jni/src/lib.rs:13) |
-| [x] | `validate_request` | Rust / compiler | `source: &str, level: i32` | `String` | [`compiler/crates/aic-jni/src/lib.rs:51`](../../compiler/crates/aic-jni/src/lib.rs:51) |
-| [x] | `binary` | Rust / compiler | `&self` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:178`](../../compiler/crates/aic-res/src/lib.rs:178) |
+| [x] | `migrate_source` | Rust / compiler | `source: &str` | `Result<String, Diagnostic>` | [`compiler/crates/aic-ir/src/lib.rs:2394`](../../compiler/crates/aic-ir/src/lib.rs:2394) |
+| [x] | `capability_catalog` | Rust / compiler | `-` | `&'static str` | [`compiler/crates/aic-ir/src/lib.rs:2417`](../../compiler/crates/aic-ir/src/lib.rs:2417) |
+| [x] | `compile_request` | Rust / compiler | `source: &str, assets: &Path, output: &Path, level: i32` | `String` | [`compiler/crates/aic-jni/src/lib.rs:13`](../../compiler/crates/aic-jni/src/lib.rs:13) |
+| [x] | `validate_request` | Rust / compiler | `source: &str, assets: &Path, level: i32` | `String` | [`compiler/crates/aic-jni/src/lib.rs:69`](../../compiler/crates/aic-jni/src/lib.rs:69) |
+| [x] | `package_resources` | Rust / compiler | `package_name: &str, strings: &[StringValue], colors: &[(String, u32)], files: &[FileResource], theme: Option<(&str, &str, &str)>,` | `Result<ResourcePackage, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:156`](../../compiler/crates/aic-res/src/lib.rs:156) |
+| [x] | `binary` | Rust / compiler | `&self` | `Result<Vec<u8>, ResourceError>` | [`compiler/crates/aic-res/src/lib.rs:713`](../../compiler/crates/aic-res/src/lib.rs:713) |
 | [x] | `balanced_signature` | Python / tooling | `lines: list[str], start: int, limit: int = 30` | `str:` | [`compiler/scripts/audit-functions.py:32`](../../compiler/scripts/audit-functions.py:32) |
 | [x] | `preceding_documentation` | Python / tooling | `lines: list[str], index: int, language: str` | `bool:` | [`compiler/scripts/audit-functions.py:47`](../../compiler/scripts/audit-functions.py:47) |
 | [x] | `split_signature` | Python / tooling | `signature: str, name: str` | `tuple[str, str]:` | [`compiler/scripts/audit-functions.py:67`](../../compiler/scripts/audit-functions.py:67) |

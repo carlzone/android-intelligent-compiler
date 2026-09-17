@@ -1,0 +1,6 @@
+aic_version 0.2 app "Invalid" package "dev.aic.invalid" {
+  activity MainActivity { on_create {
+    let text = android.text_view(text: resource.string(missing))
+    android.set_content_view(text)
+  } }
+}

@@ -1,13 +1,13 @@
 # M9 current handoff
 
-Updated: 2026-09-14 (Asia/Taipei)
+Updated: 2026-09-17 (Asia/Taipei)
 
 ## Current state
 
-- M9 remains open. M9.1 and M9.3 are implemented; M9.2, M9.4, and M9.6 are partial; M9.5 has not started; M9.7 remains blocked by implementation and matrix prerequisites.
+- M9 remains open. M9.1, M9.3, M9.4, and M9.5 are implemented; M9.2 and M9.6 are partial; the M9.5 API 36 O0/O1 device rows passed, while M9.7 remains open.
 - M9.3 is complete. The user explicitly waived manual TalkBack checks on non-hardware API profiles; API 35 tablet/compact automated accessibility evidence and the full API 36 physical-device TalkBack pass are retained.
 - M9.2 typed start-for-result/results and Bundle state restoration remain separate open dependencies for milestone closure. Do not switch to them while continuing the selected M9.4 task unless explicitly requested.
-- No new capability was added. Compiler and host `aic.capabilities/0.2` catalogs remain identical; project assets, lifecycle restoration, localization/resources, images, and adaptive UI remain `planned`.
+- Compiler and host `aic.capabilities/0.2` catalogs remain identical. `ui.adaptive` and `lifecycle.state_restoration` are supported after their local parser/verifier/optimizer/DEX/reproducibility gates and API 36 physical-device O0 checklist passed.
 
 ## Uncommitted implementation to preserve
 
@@ -24,6 +24,10 @@ Run `git status --short` before any edit. The expected changed paths are the roo
 
 ## Verification already completed
 
+M9.4 passes compiler-owned deterministic resource packaging, typed runtime lowering, bounded project-asset validation/transport, the full compiler workspace suite, host JVM tests/lint, and the independent Build Tools 35 AAPT2 fixed-ID semantic oracle. The oracle covers decoded default/`zh-TW` strings, colors, style parent/items, and launcher mipmap while remaining outside production builds.
+
+The user also completed the dedicated M9.4 physical-device checklist at both O0 and O1 on 2026-09-15 and reported every item `OK`. Both signed APKs were byte-identical at SHA-256 `83BFAB9455A48A3AD819F838DFC678765A5868F3DFC9C3D5CC26D05F3F7257AC`; `resources.arsc` was `9B80B0F046DA5B54CEE2BDF25E1E59DBEAD93DAED8899EA16D2953CA822D041B`, and `classes.dex` was `2CB64436446CCCF2262CF54CA81EFE03EC414A5BE857816E363859DB17B74D02` at both levels.
+
 - Compiler workspace tests: passed.
 - Strict workspace Clippy with `-D warnings`: passed.
 - Host JVM tests and lint: passed.
@@ -39,6 +43,10 @@ Toolchain: source base `6f15fd41174ed72e18b6c308d316eecd42cf9cdf` plus the curre
 
 ## Device evidence
 
+- On 2026-09-17 the corrected M9.5 O0 and O1 adaptive/lifecycle artifacts passed the full user-run tasks 1-10 checklist on the API 36 ARM64 physical phone. This covers portrait/landscape and compact/expanded selection, rotation and process-death restoration, password exclusion, locale, 1.3x font scaling, TalkBack, 48dp targets, density/screen-size variants, and final cold launch. Package `dev.aic.adaptive`; byte-identical O0/O1 signed APK SHA-256 `94E529D345F479B10140B2D9C5CDF4CB826D6CA3AEB374B3EC0852A213F44CD8`. M9.7 remains pending.
+
+- The dedicated M9.4 resource fixture (`dev.aic.m94device`) passed every supplied checklist item at O0 and O1 on the recorded API 36 ARM64 physical device. This closes the focused resource-device scenario while the exhaustive M9.7 compatibility matrix remains open.
+
 - The user reported every supplied regression check OK at both O0 and O1, including the new Details `ScrollView`, navigation, controls, rotation/resume, enlarged font, TalkBack semantics, and final cold launch.
 - Device: serial `e56c4a46`, model `2312DRA50G`, ABI `arm64-v8a`, Android 16/API 36.
 - Fingerprint: `Redmi/garnet_global/garnet:16/BP2A.250605.031.A3/OS3.0.4.0.WNRMIXM:user/release-keys`.
@@ -52,4 +60,6 @@ Toolchain: source base `6f15fd41174ed72e18b6c308d316eecd42cf9cdf` plus the curre
 
 ## Exact next task
 
-Continue with M9.4. Begin with the canonical resource declaration/model and deterministic resource-ID/package foundation needed by default and BCP-47 localized strings, then add project-image references and host-to-compiler asset transfer. Keep `resources.localization`, `resources.images`, and `ui.image.project_asset` planned until their parser, verifier, packaging/lowering, invalid-fixture, capability, deterministic O0/O1, and AAPT2-oracle evidence is complete.
+Resume the remaining M9.2 typed start-for-result/results work, then complete
+M9.6 integration and the exhaustive M9.7 compatibility matrix. Preserve both
+retained M9.4/M9.5 implementation traces and their passing O0/O1 evidence.

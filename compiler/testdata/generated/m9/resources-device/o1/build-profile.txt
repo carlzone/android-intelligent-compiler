@@ -1,0 +1,13 @@
+profile=android-35
+dex=035
+minSdk=23
+targetSdk=35
+optLevel=1
+capabilities=
+permissions=
+functions.before=0
+functions.after=0
+functions.removed=0
+resources.before=0
+resources.after=0
+resources.removed=0

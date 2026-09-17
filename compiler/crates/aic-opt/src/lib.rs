@@ -74,6 +74,9 @@ pub fn optimize_with_report(
                 s.initial = expression(s.initial.clone());
             }
             activity.on_create = statements(std::mem::take(&mut activity.on_create));
+            for variant in &mut activity.on_create_variants {
+                variant.body = statements(std::mem::take(&mut variant.body));
+            }
             for h in &mut activity.on_click {
                 h.body = statements(std::mem::take(&mut h.body));
             }
@@ -113,11 +116,23 @@ pub fn analyze(p: &Program) -> Reachability {
     r
 }
 fn roots(p: &Program, r: &mut Reachability) {
+    if p.activities
+        .iter()
+        .any(|activity| !activity.on_create_variants.is_empty())
+    {
+        r.capabilities.insert(Capability::Adaptive);
+    }
+    if p.capabilities.contains(&Capability::StateRestoration) {
+        r.capabilities.insert(Capability::StateRestoration);
+    }
     for activity in &p.activities {
         for s in &activity.state {
             inspect_expression(&s.initial, r);
         }
         inspect_statements(&activity.on_create, r);
+        for variant in &activity.on_create_variants {
+            inspect_statements(&variant.body, r);
+        }
         for h in &activity.on_click {
             inspect_statements(&h.body, r);
         }
@@ -386,7 +401,9 @@ fn inspect_statements(xs: &[Statement], r: &mut Reachability) {
             | StatementKind::SetHeading { view: id }
             | StatementKind::SetDecorative { view: id }
             | StatementKind::SetTextColor { view: id, .. }
-            | StatementKind::SetBackgroundColor { view: id, .. } => {
+            | StatementKind::SetBackgroundColor { view: id, .. }
+            | StatementKind::SetTextResourceColor { view: id, .. }
+            | StatementKind::SetBackgroundResourceColor { view: id, .. } => {
                 r.views.insert(id.clone());
             }
             StatementKind::SetPadding { view, .. }
@@ -482,7 +499,10 @@ fn inspect_expression(e: &Expression, r: &mut Reachability) {
             inspect_expression(id, r);
             inspect_expression(default, r);
         }
-        ExpressionKind::Literal(_) | ExpressionKind::Name(_) => {}
+        ExpressionKind::Literal(_)
+        | ExpressionKind::Name(_)
+        | ExpressionKind::ResourceString { .. }
+        | ExpressionKind::ResourceColor { .. } => {}
     }
 }
 
@@ -690,6 +710,33 @@ mod tests {
     }
 
     #[test]
+    fn m9_typed_resources_survive_o0_and_o1() {
+        let program = parse_program(include_str!("../../../testdata/m9-resources.aic")).unwrap();
+        for options in [
+            CompilerOptions {
+                optimization_level: OptimizationLevel::None,
+            },
+            CompilerOptions::default(),
+        ] {
+            let optimized = optimize(program.clone(), options);
+            assert_eq!(optimized.string_resources, program.string_resources);
+            assert_eq!(optimized.color_resources, program.color_resources);
+            assert_eq!(optimized.app_theme, program.app_theme);
+            assert!(optimized
+                .activity
+                .on_create
+                .iter()
+                .any(|statement| matches!(
+                    statement.kind,
+                    StatementKind::SetTextResourceColor {
+                        id: 0x7f02_0001,
+                        ..
+                    }
+                )));
+        }
+    }
+
+    #[test]
     fn folds_away_and_prunes_dead_persistence_resources() {
         let source = "aic_version 0.1 app \"x\" package \"dev.aic.x\" { capability persistence.key_value preference legacy: bool = false activity MainActivity { on_create { let root = android.linear_layout(orientation: vertical) if 1 + 1 == 3 { preference.set(legacy, true) } android.set_content_view(root) } } }";
         let p = parse_program(source).unwrap();
@@ -697,6 +744,30 @@ mod tests {
         assert!(q.capabilities.is_empty());
         assert!(q.preferences.is_empty());
         assert_eq!(report.removed_resources(), 1);
+    }
+
+    #[test]
+    fn m9_adaptive_variants_survive_o0_and_o1() {
+        let program =
+            parse_program(include_str!("../../../testdata/m9-adaptive-lifecycle.aic")).unwrap();
+        for options in [
+            CompilerOptions {
+                optimization_level: OptimizationLevel::None,
+            },
+            CompilerOptions::default(),
+        ] {
+            let optimized = optimize(program.clone(), options);
+            assert_eq!(optimized.activity.on_create_variants.len(), 4);
+            assert!(optimized
+                .activity
+                .on_create_variants
+                .iter()
+                .all(|variant| variant.body.iter().any(|statement| matches!(
+                    statement.kind,
+                    StatementKind::SetContentView { .. }
+                ))));
+            assert!(optimized.capabilities.contains(&Capability::Adaptive));
+        }
     }
 
     #[test]

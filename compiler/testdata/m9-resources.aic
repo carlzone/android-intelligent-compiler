@@ -1,0 +1,14 @@
+aic_version 0.2 app "Localized resources" package "dev.aic.resources" {
+  resources {
+    string greeting = "Hello"
+    string greeting locale "zh-TW" = "你好"
+    color primary = "#1565C0"
+    color accent = "#FF8F00"
+    theme app primary primary accent accent
+  }
+  activity MainActivity { on_create {
+    let greeting = android.text_view(text: resource.string(greeting))
+    android.set_text_color(view: greeting, color: resource.color(primary))
+    android.set_content_view(greeting)
+  } }
+}

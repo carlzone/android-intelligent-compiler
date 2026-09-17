@@ -33,6 +33,16 @@ pub struct BuildArtifacts {
     pub activities: Vec<String>,
     pub ir_version: String,
     pub catalog_version: &'static str,
+    /// Canonical application string IDs, sorted by resource name.
+    pub string_resource_ids: Vec<(String, u32)>,
+    pub resources_arsc: Vec<u8>,
+    pub resource_entries: Vec<(String, Vec<u8>)>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProjectAsset {
+    pub name: String,
+    pub bytes: Vec<u8>,
 }
 
 /// Compile validated AIC source without filesystem or Android host dependencies.
@@ -41,6 +51,18 @@ pub struct BuildArtifacts {
 pub fn compile_source(
     source: &str,
     options: CompilerOptions,
+) -> Result<BuildArtifacts, BuildError> {
+    compile_source_with_assets(source, options, &[])
+}
+
+/// Compile validated AIC source with an explicit, bounded project-asset collection.
+/// # Errors
+/// Returns source-located validation, lowering, resource, asset, or APK packaging failures.
+#[allow(clippy::too_many_lines)]
+pub fn compile_source_with_assets(
+    source: &str,
+    options: CompilerOptions,
+    assets: &[ProjectAsset],
 ) -> Result<BuildArtifacts, BuildError> {
     let parsed = parse_program(source).map_err(|e| BuildError {
         stage: "validate",
@@ -78,20 +100,84 @@ pub fn compile_source(
         optimization.preferences_before + optimization.tables_before,
         optimization.preferences_after + optimization.tables_after, optimization.removed_resources());
     let activity_names: Vec<_> = program.activities.iter().map(|a| a.name.clone()).collect();
-    let manifest = aic_res::Manifest::new_multi(&program.package, &program.label, &activity_names);
+    let files = validate_project_assets(&program, assets)?;
+    let strings = program
+        .string_resources
+        .iter()
+        .map(|resource| aic_res::StringValue {
+            name: resource.name.clone(),
+            locale: resource.locale.clone(),
+            value: resource.value.clone(),
+        })
+        .collect::<Vec<_>>();
+    let colors = program
+        .color_resources
+        .iter()
+        .map(|resource| {
+            let digits = resource.value.trim_start_matches('#');
+            let value = u32::from_str_radix(digits, 16).map_err(|_| BuildError {
+                stage: "package",
+                code: "AIC8003",
+                message: "Verified color could not be encoded".into(),
+                location: Some(resource.span),
+            })?;
+            Ok((
+                resource.name.clone(),
+                if digits.len() == 6 {
+                    0xff00_0000 | value
+                } else {
+                    value
+                },
+            ))
+        })
+        .collect::<Result<Vec<_>, BuildError>>()?;
+    let theme = program.app_theme.as_ref().map(|theme| {
+        (
+            theme.name.as_str(),
+            theme.primary.name.as_str(),
+            theme.accent.name.as_str(),
+        )
+    });
+    let resources = aic_res::package_resources(&program.package, &strings, &colors, &files, theme)
+        .map_err(|e| BuildError {
+            stage: "package",
+            code: "AIC8003",
+            message: e.to_string(),
+            location: None,
+        })?;
+    let theme_id = program
+        .app_theme
+        .as_ref()
+        .and_then(|theme| resources.ids.style(&theme.name));
+    let icon_id = program
+        .launcher_icon
+        .as_ref()
+        .and_then(|icon| resources.ids.mipmap(&icon.name));
+    let manifest = aic_res::Manifest::new_multi_resources(
+        &program.package,
+        &program.label,
+        &activity_names,
+        theme_id,
+        icon_id,
+    );
     let binary_manifest = manifest.binary().map_err(|e| BuildError {
         stage: "package",
         code: "AIC8001",
         message: e.to_string(),
         location: None,
     })?;
-    let unsigned_apk =
-        assemble_apk_files(&binary_manifest, &dex_files).map_err(|e| BuildError {
-            stage: "package",
-            code: "AIC8002",
-            message: e.to_string(),
-            location: None,
-        })?;
+    let unsigned_apk = assemble_apk_resources(
+        &binary_manifest,
+        &resources.table,
+        &resources.entries,
+        &dex_files,
+    )
+    .map_err(|e| BuildError {
+        stage: "package",
+        code: "AIC8002",
+        message: e.to_string(),
+        location: None,
+    })?;
     Ok(BuildArtifacts {
         dex,
         dex_files,
@@ -108,7 +194,119 @@ pub fn compile_source(
             .collect(),
         ir_version: program.version.clone(),
         catalog_version: "aic.capabilities/0.2",
+        string_resource_ids: resources
+            .ids
+            .iter_strings()
+            .map(|(name, id)| (name.to_owned(), id))
+            .collect(),
+        resources_arsc: resources.table,
+        resource_entries: resources.entries,
     })
+}
+
+fn validate_project_assets(
+    program: &aic_ir::Program,
+    assets: &[ProjectAsset],
+) -> Result<Vec<aic_res::FileResource>, BuildError> {
+    const MAX_TOTAL: usize = 10 * 1024 * 1024;
+    if assets.len() > 64 || assets.iter().map(|asset| asset.bytes.len()).sum::<usize>() > MAX_TOTAL
+    {
+        return Err(BuildError {
+            stage: "validate",
+            code: "AIC8004",
+            message: "Project image count or total size exceeds the supported limit".into(),
+            location: None,
+        });
+    }
+    let mut supplied = std::collections::BTreeMap::new();
+    for asset in assets {
+        if supplied
+            .insert(asset.name.as_str(), asset.bytes.as_slice())
+            .is_some()
+        {
+            return Err(BuildError {
+                stage: "validate",
+                code: "AIC8005",
+                message: "Duplicate project asset".into(),
+                location: None,
+            });
+        }
+    }
+    if supplied.len() != program.image_resources.len() {
+        return Err(BuildError {
+            stage: "validate",
+            code: "AIC8006",
+            message: "Declared and supplied project images must match exactly".into(),
+            location: None,
+        });
+    }
+    let launcher = program
+        .launcher_icon
+        .as_ref()
+        .map(|icon| icon.name.as_str());
+    program
+        .image_resources
+        .iter()
+        .map(|image| {
+            let bytes = supplied
+                .get(image.project_asset.as_str())
+                .ok_or_else(|| BuildError {
+                    stage: "validate",
+                    code: "AIC8006",
+                    message: format!("Missing project asset `{}`", image.project_asset),
+                    location: Some(image.span),
+                })?;
+            validate_image(&image.project_asset, bytes).map_err(|message| BuildError {
+                stage: "validate",
+                code: "AIC8007",
+                message,
+                location: Some(image.span),
+            })?;
+            let extension = image
+                .project_asset
+                .rsplit_once('.')
+                .expect("verified asset name")
+                .1;
+            Ok(aic_res::FileResource {
+                name: image.name.clone(),
+                extension: extension.into(),
+                bytes: bytes.to_vec(),
+                launcher: launcher == Some(image.name.as_str()),
+            })
+        })
+        .collect()
+}
+
+fn validate_image(name: &str, bytes: &[u8]) -> Result<(), String> {
+    const MAX_IMAGE: usize = 4 * 1024 * 1024;
+    if bytes.is_empty() || bytes.len() > MAX_IMAGE {
+        return Err(format!("Image asset `{name}` exceeds the supported size"));
+    }
+    let extension = std::path::Path::new(name).extension();
+    let png = extension.is_some_and(|value| value.eq_ignore_ascii_case("png"))
+        && bytes.len() >= 24
+        && bytes[..8] == [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]
+        && &bytes[12..16] == b"IHDR"
+        && (1..=8192).contains(&u32::from_be_bytes(
+            bytes[16..20].try_into().expect("four bytes"),
+        ))
+        && (1..=8192).contains(&u32::from_be_bytes(
+            bytes[20..24].try_into().expect("four bytes"),
+        ));
+    let webp = extension.is_some_and(|value| value.eq_ignore_ascii_case("webp"))
+        && bytes.len() >= 16
+        && &bytes[..4] == b"RIFF"
+        && &bytes[8..12] == b"WEBP"
+        && u64::from(u32::from_le_bytes(
+            bytes[4..8].try_into().expect("four bytes"),
+        )) + 8
+            == bytes.len() as u64
+        && matches!(&bytes[12..16], b"VP8 " | b"VP8L" | b"VP8X");
+    if png || webp {
+        Ok(())
+    } else {
+        Err(format!("Image asset `{name}` has invalid content"))
+    }
 }
 
 /// Assemble the supported resource-free APK in deterministic entry order.
@@ -133,6 +331,41 @@ pub fn assemble_apk_files(
         apk = inject_stored_zip(&apk, name, bytes)?;
     }
     Ok(apk)
+}
+
+/// Assemble deterministic compiler-owned resource and DEX entries.
+/// # Errors
+/// Rejects unsafe names, duplicate entries, malformed base ZIP state, and ZIP size limits.
+pub fn assemble_apk_resources(
+    manifest: &[u8],
+    resources: &[u8],
+    resource_entries: &[(String, Vec<u8>)],
+    dex_files: &[(String, Vec<u8>)],
+) -> Result<Vec<u8>, ZipError> {
+    let mut empty = vec![0x50, 0x4b, 0x05, 0x06];
+    empty.resize(22, 0);
+    let mut apk = inject_stored_zip(&empty, "AndroidManifest.xml", manifest)?;
+    if !resources.is_empty() {
+        apk = inject_stored_zip(&apk, "resources.arsc", resources)?;
+    }
+    for (name, bytes) in resource_entries {
+        if !valid_apk_entry(name) || !name.starts_with("res/") {
+            return Err(ZipError("Invalid resource ZIP entry name"));
+        }
+        apk = inject_stored_zip(&apk, name, bytes)?;
+    }
+    for (name, bytes) in dex_files {
+        apk = inject_stored_zip(&apk, name, bytes)?;
+    }
+    Ok(apk)
+}
+
+fn valid_apk_entry(name: &str) -> bool {
+    !name.is_empty()
+        && name.is_ascii()
+        && !name.starts_with('/')
+        && !name.contains('\\')
+        && name.split('/').all(|part| !matches!(part, "" | "." | ".."))
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -282,6 +515,8 @@ mod tests {
             include_str!("../../../testdata/calculator.aic"),
             include_str!("../../../testdata/notes.aic"),
             include_str!("../../../testdata/m5-optimizer.aic"),
+            include_str!("../../../testdata/m9-resources.aic"),
+            include_str!("../../../testdata/m9-adaptive-lifecycle.aic"),
         ] {
             for optimization_level in [OptimizationLevel::None, OptimizationLevel::Basic] {
                 let options = CompilerOptions { optimization_level };
@@ -318,6 +553,87 @@ mod tests {
         assert_eq!(
             result,
             compile_source(source, CompilerOptions::default()).unwrap()
+        );
+    }
+    #[test]
+    fn m9_exposes_canonical_string_resource_ids() {
+        let source = r#"aic_version 0.2 app "Resources" package "dev.aic.resources" {
+            resources {
+                string greeting locale "zh-TW" = "你好"
+                string greeting = "Hello"
+                string action_save = "Save"
+            }
+            activity MainActivity { on_create {
+                let text = android.text_view(text: resource.string(greeting) + resource.string(action_save))
+                android.set_content_view(text)
+            } }
+        }"#;
+        for optimization_level in [OptimizationLevel::None, OptimizationLevel::Basic] {
+            let artifacts = compile_source(source, CompilerOptions { optimization_level }).unwrap();
+            assert_eq!(
+                artifacts.string_resource_ids,
+                vec![
+                    ("action_save".to_owned(), 0x7f01_0000),
+                    ("greeting".to_owned(), 0x7f01_0001),
+                ]
+            );
+        }
+    }
+    #[test]
+    fn m9_packages_localized_typed_resources_and_assets_deterministically() {
+        let source = r##"aic_version 0.2 app "Resources" package "dev.aic.resources" {
+            resources {
+                string greeting = "Hello"
+                string greeting locale "zh-TW" = "你好"
+                color primary = "#112233"
+                color accent = "#FF445566"
+                image launcher project_asset "launcher.png"
+                theme app primary primary accent accent
+                launcher_icon launcher
+            }
+            activity MainActivity { on_create {
+                let text = android.text_view(text: resource.string(greeting))
+                android.set_text_color(view: text, color: resource.color(primary))
+                let image = android.image_view(resource: resource.image(launcher))
+                android.set_decorative(view: image)
+                android.set_content_view(text)
+            } }
+        }"##;
+        let mut png = vec![0_u8; 24];
+        png[..8].copy_from_slice(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]);
+        png[12..16].copy_from_slice(b"IHDR");
+        png[19] = 1;
+        png[23] = 1;
+        let assets = vec![ProjectAsset {
+            name: "launcher.png".into(),
+            bytes: png,
+        }];
+        let mut outputs = Vec::new();
+        for optimization_level in [OptimizationLevel::None, OptimizationLevel::Basic] {
+            let options = CompilerOptions { optimization_level };
+            let first = compile_source_with_assets(source, options, &assets).unwrap();
+            let second = compile_source_with_assets(source, options, &assets).unwrap();
+            assert_eq!(first, second);
+            assert!(!first.resources_arsc.is_empty());
+            assert_eq!(first.resource_entries[0].0, "res/mipmap/launcher.png");
+            assert!(first.manifest.contains("@style/app"));
+            assert!(first.manifest.contains("@mipmap/launcher"));
+            assert!(first
+                .unsigned_apk
+                .windows(14)
+                .any(|bytes| bytes == b"resources.arsc"));
+            outputs.push(first);
+        }
+        assert_eq!(outputs[0].resources_arsc, outputs[1].resources_arsc);
+        assert_eq!(outputs[0].resource_entries, outputs[1].resource_entries);
+        assert_eq!(outputs[0].binary_manifest, outputs[1].binary_manifest);
+        assert_eq!(outputs[0].dex_files, outputs[1].dex_files);
+        assert_eq!(outputs[0].unsigned_apk, outputs[1].unsigned_apk);
+        assert_eq!(
+            compile_source(source, CompilerOptions::default())
+                .unwrap_err()
+                .code,
+            "AIC8006"
         );
     }
     #[test]

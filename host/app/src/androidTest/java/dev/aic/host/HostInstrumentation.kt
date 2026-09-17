@@ -48,7 +48,8 @@ class HostInstrumentation : Instrumentation() {
                 val built=BuildPipeline(context).build(source,level,dir) { }
                 File(dir,"source.aic").writeText(source)
                 val repeat=File(dir,"repeat")
-                check(JSONObject(NativeCompiler.compile(source,repeat.path,level)).getBoolean("ok"))
+                val assets=File(repeat,"project-assets").apply { mkdirs() }
+                check(JSONObject(NativeCompiler.compile(source,assets.path,repeat.path,level)).getBoolean("ok"))
                 check(File(dir,"classes.dex").readBytes().contentEquals(File(repeat,"classes.dex").readBytes()))
                 for(artifact in listOf("AndroidManifest.axml", "unsigned.apk")) {
                     check(File(dir,artifact).readBytes().contentEquals(File(repeat,artifact).readBytes()))
@@ -58,10 +59,11 @@ class HostInstrumentation : Instrumentation() {
                 acceptanceProject(ProjectData("M6 $name O$level",source,optLevel=level))
                 lines+="PASS: $name O$level JNI deterministic DEX, binary manifest, APK assembly, signing"
             }
-            val invalid=JSONObject(NativeCompiler.compile("invalid source",File(evidence,"invalid").path,1))
+            val emptyAssets=File(evidence,"empty-assets").apply { mkdirs() }
+            val invalid=JSONObject(NativeCompiler.compile("invalid source",emptyAssets.path,File(evidence,"invalid").path,1))
             check(!invalid.getBoolean("ok") && invalid.getJSONArray("diagnostics").getJSONObject(0).getJSONObject("location").getInt("line")==1)
             val blocked=File(evidence,"not-a-directory").apply { writeText("occupied") }
-            check(!JSONObject(NativeCompiler.compile(sample,blocked.path,1)).getBoolean("ok"))
+            check(!JSONObject(NativeCompiler.compile(sample,emptyAssets.path,blocked.path,1)).getBoolean("ok"))
             lines+="PASS: source-located malformed-input errors and output storage failure"
 
             for(kind in ProviderKind.entries.filter { it.credentialLabel!=null }) {
@@ -83,9 +85,9 @@ class HostInstrumentation : Instrumentation() {
                     .put("summary","Rename the app title").put("touched_areas",org.json.JSONArray().put("metadata")).toString()
                 ModelAnswer("test","deterministic",null,body)
             }
-            val accepted=AiRepairLoop(fake,{ JSONObject(NativeCompiler.validate(it,1)) }).run(AiOperation.PATCH,"rename the title",aiBase)
+            val accepted=AiRepairLoop(fake,{ JSONObject(NativeCompiler.validate(it,emptyAssets.path,1)) }).run(AiOperation.PATCH,"rename the title",aiBase)
             check(accepted.proposal?.source==aiPatched && accepted.attempts==2 && sawRepair)
-            val failed=AiRepairLoop(ModelProvider { ModelAnswer("test","invalid",null,"{}") },{ JSONObject(NativeCompiler.validate(it,1)) })
+            val failed=AiRepairLoop(ModelProvider { ModelAnswer("test","invalid",null,"{}") },{ JSONObject(NativeCompiler.validate(it,emptyAssets.path,1)) })
                 .run(AiOperation.PATCH,"invent a teleport API",aiBase)
             check(failed.proposal==null && failed.diagnostic.contains("preserved") && calls==2)
             check(aiBase==context.assets.open("templates/counter.aic").bufferedReader().use { it.readText() })

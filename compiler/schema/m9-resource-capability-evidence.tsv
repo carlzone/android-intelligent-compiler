@@ -1,0 +1,5 @@
+capability	grammar	verifier	optimizer	lowering	invalid_fixture	runnable_or_oracle
+resources.localization	resources/string + resource.string	aic-ir resource verification	aic-opt expression preservation	Context.getString	m9-resource-missing-string.aic,m9-resource-unused.aic	m9-resources.aic + verify-m9-resources.py
+resources.images	resources/image project_asset	aic-ir image/asset verification	aic-opt image preservation	ImageView.setImageResource	m9-resource-invalid-asset.aic	verify-m9-resources.py
+ui.image.project_asset	android.image_view(resource: resource.image(...))	aic-ir typed image verification	aic-opt image preservation	ImageView.setImageResource	m9-resource-invalid-asset.aic	verify-m9-resources.py
+resources.color_theme_icon	color/theme/launcher_icon	aic-ir bounded theme verification	aic-opt color preservation	Resources.getColor + manifest refs	m9-resource-theme-color.aic	m9-resources.aic + verify-m9-resources.py

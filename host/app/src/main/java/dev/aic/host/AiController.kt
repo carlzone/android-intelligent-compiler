@@ -5,6 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import org.json.JSONObject
 import java.util.concurrent.Executors
+import java.io.File
+import java.util.UUID
 
 class AiController private constructor(private val context: Context) {
     private val worker=Executors.newSingleThreadExecutor(); private val main=Handler(Looper.getMainLooper())
@@ -13,7 +15,7 @@ class AiController private constructor(private val context: Context) {
     var log="AI ready. Configure an API key, then describe a new app or an edit."; private set
     var changed: (() -> Unit)?=null
 
-    fun start(projectId: String?, operation: AiOperation, prompt: String, current: String?, level: Int) {
+    fun start(projectId: String?, operation: AiOperation, prompt: String, current: String?, level: Int, images: Map<String,ByteArray>) {
         check(!busy) { "An AI request is already running" }
         val prefs=context.getSharedPreferences("ai-settings",Context.MODE_PRIVATE)
         val kind=ProviderKind.from(prefs.getString("provider",ProviderKind.OPENAI.id))
@@ -24,11 +26,14 @@ class AiController private constructor(private val context: Context) {
         val provenance=AiProvenance(context)
         busy=true; outcome=null; log="AI ${operation.wire} request running…"; changed?.invoke()
         worker.execute {
+            val assetDir=File(context.cacheDir,"ai-assets/${UUID.randomUUID()}").apply { mkdirs() }
+            for((name,bytes) in images.toSortedMap()) File(assetDir,name).writeBytes(bytes)
             val result=runCatching {
-                AiRepairLoop(provider,{ JSONObject(NativeCompiler.validate(it,level)) }) { turn,answer,status ->
+                AiRepairLoop(provider,{ JSONObject(NativeCompiler.validate(it,assetDir.path,level)) }) { turn,answer,status ->
                     provenance.record(projectId,turn,answer,status)
                 }.run(operation,prompt,current)
             }
+            assetDir.deleteRecursively()
             main.post {
                 busy=false
                 result.fold({ value -> outcome=value; log=value.diagnostic }, { error ->

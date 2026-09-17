@@ -45,7 +45,7 @@ class BuildController private constructor(private val context: Context) {
         changed?.invoke()
         worker.execute {
             val directory=File(context.filesDir,"builds/${UUID.randomUUID()}")
-            val outcome=runCatching { BuildPipeline(context).build(project.data.source,project.data.optLevel,directory) { message -> main.post { append(message) } } }
+            val outcome=runCatching { BuildPipeline(context).build(project.data,directory) { message -> main.post { append(message) } } }
             main.post {
                 busy=false
                 outcome.fold({ built ->
@@ -68,7 +68,11 @@ class BuildController private constructor(private val context: Context) {
         fun get(context: Context): BuildController = instance ?: synchronized(this) {
             instance ?: BuildController(context.applicationContext).also { instance=it }
         }
-        fun hash(data: ProjectData): String = MessageDigest.getInstance("SHA-256")
-            .digest((data.profile+"\n"+data.optLevel+"\n"+data.source).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        fun hash(data: ProjectData): String {
+            val digest=MessageDigest.getInstance("SHA-256")
+            digest.update((data.profile+"\n"+data.optLevel+"\n"+data.source).toByteArray(Charsets.UTF_8))
+            for((name,bytes) in data.images.toSortedMap()) { digest.update(0); digest.update(name.toByteArray(Charsets.UTF_8)); digest.update(0); digest.update(bytes) }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
     }
 }

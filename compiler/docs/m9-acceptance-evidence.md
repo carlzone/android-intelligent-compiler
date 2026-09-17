@@ -12,12 +12,62 @@ verification, device, and resume snapshot.
 | M9.1 IR/migration/catalog | Parser/verifier migration tests, CLI migration, compiler/host catalog parity | Full 0.1 behavior and APK reproducibility corpus remains part of final run | Implemented; final rerun pending |
 | M9.2 screens/navigation/state | Multi-Activity DEX/manifest tests and start/finish fixture; typed Intent extras parser/verifier/lowering | Results, Bundle restoration, and device lifecycle evidence missing | Active / partial |
 | M9.3 UI/widgets/accessibility | The complete declared surface is mapped to grammar, verifier, optimizer, lowering, invalid-input, and runnable evidence; `m9-navigation.aic` also covers valid single-child ScrollView composition | API 36 ARM64 physical-phone checks pass at O0/O1; API 35 x86_64 tablet at 2560x1600/320dpi and compact 720x1280/240dpi automated checks pass at O0/O1; manual TalkBack on non-hardware API profiles was explicitly waived | Complete with documented emulator-accessibility limitation |
-| M9.4 resources/localization/assets | Project format 2 codec and asset-validation tests | Resource table/package, locale, image build, and AAPT2 evidence missing | Partial |
-| M9.5 adaptive/lifecycle corpus | None yet for the complete declared behavior | Rotation, process death, locale, font, TalkBack, density, and size matrix missing | Not started |
+| M9.4 resources/localization/assets | Compiler-owned resource table/package; typed string/color/image lowering; bounded theme/icon; exact host asset transfer; invalid fixtures; O0/O1 reproducibility | Build Tools 35 AAPT2 fixed-ID semantic oracle and API 36 ARM64 physical-device O0/O1 checklist passed; wider device matrix remains M9.7 | Implemented; final matrix pending |
+| M9.5 adaptive/lifecycle corpus | Four exhaustive qualified variants, 600dp dispatch, stable view signatures/IDs, scalar Bundle save/restore, mutable hierarchy restoration, password exclusion, density-correct layout dimensions, invalid fixtures, O0/O1 deterministic DEX corpus | API 36 ARM64 physical-device O0/O1 checklists passed for tasks 1-10; exhaustive compatibility remains M9.7 | Implemented; focused device rows passed |
 | M9.6 host/AI/diagnostics/reference apps | IR 0.2 contract/templates, initial fixture, ADR, and build script | Final response schema and three-app corpus missing | Partial |
 | M9.7 acceptance/closure | Local tests have passed during implemented tranches | Full fingerprinted desktop/device run and M8 matrix closure missing | Blocked |
 
-M9.3 is complete as of 2026-09-15. The representative matrix is the API 36 ARM64 480dpi physical phone plus API 35 x86_64 tablet and compact emulator profiles. The user explicitly waived manual TalkBack confirmation on non-hardware API profiles; API 35 retains automated accessibility-node/service evidence, while the complete manual TalkBack scenario passed on API 36 hardware. Exhaustive API 23-36 generated-app and API 30-36 native ARM64 compatibility remains an M8/M9.7 gate. The current milestone resume point is M9.4 canonical resources and deterministic APK resource packaging.
+M9.3 is complete as of 2026-09-15. M9.4 is now locally implemented: repeated O0/O1 resource builds are deterministic, direct DEX resource calls are covered, host JVM tests/lint pass, and Build Tools 35 AAPT2 independently accepts and semantically matches the compiler table for fixed IDs, default/`zh-TW` strings, colors, style items, and launcher mipmap. Exhaustive API 23-36 generated-app and API 30-36 native ARM64 compatibility remains an M8/M9.7 gate.
+
+### M9.5 local implementation evidence — 2026-09-16
+
+The adaptive/lifecycle corpus passed locked workspace tests and strict Clippy at
+O0/O1, deterministic direct-DEX inspection, compiler/host capability-catalog
+parity, host JVM tests, lint, debug/Android-test assembly, the full offline M9
+script, and the retained M9.4 AAPT2 oracle. The generated Activity uses only
+direct configuration, view-hierarchy, and typed Bundle APIs; reflection remains
+absent. `adb devices -l` reported no connected devices, so rotation,
+process-death, locale, font-scale, TalkBack, density, and screen-size device
+rows were not claimed and remain pending.
+
+### M9.5 O0/O1 physical-device evidence — 2026-09-17
+
+The initial device run exposed raw-pixel lowering for IR dp dimensions and an
+over-wide single-row landscape fixture. The compiler now converts explicit
+dimensions and margins using `DisplayMetrics.densityDpi`, and both landscape
+variants use readable full-width rows. Workspace tests passed after the fix.
+The corrected O0 APK installed and cold-launched on the API 36 ARM64 phone; an
+automated landscape hierarchy check confirmed `landscape expanded`, two
+full-width input fields, all expected controls, and a clean AndroidRuntime
+crash buffer. The user subsequently completed the full supplied M9.5 device
+checklist at both O0 and O1 and reported every item `OK`: portrait/landscape selection,
+compact/expanded adaptation, rotation and process-death restoration, password
+non-restoration, locale changes, 1.3x font scaling, TalkBack semantics and
+activation, 48dp targets, density/screen-size variants, restored settings, and
+final cold-launch stability.
+
+- Device serial/model/ABI: `e56c4a46`, `2312DRA50G`, `arm64-v8a`
+- Android/API: Android 16, API 36
+- Fingerprint: `Redmi/garnet_global/garnet:16/BP2A.250605.031.A3/OS3.0.4.0.WNRMIXM:user/release-keys`
+- Package/activity: `dev.aic.adaptive/.MainActivity`
+- O0/O1 signed APK SHA-256: `94E529D345F479B10140B2D9C5CDF4CB826D6CA3AEB374B3EC0852A213F44CD8`
+- The exhaustive M9.7 API/device matrix remains pending and is not implied by
+  these focused physical-device passes.
+
+### M9.4 resources O0/O1 physical-device evidence — 2026-09-15
+
+The user completed the complete supplied M9.4 resources checklist at both O0 and O1 and reported every item `OK`. This confirms the dedicated resource fixture installs, launches, and exercises its compiler-owned resource table, typed string/color/image references, bounded application theme and launcher icon, project image, and localized-string behavior on the physical API 36 ARM64 device at both optimization levels without a reported resource-resolution failure, crash, or rendering regression.
+
+- Device serial/model/ABI: `e56c4a46`, `2312DRA50G`, `arm64-v8a`
+- Android/API: Android 16, API 36
+- Fingerprint: `Redmi/garnet_global/garnet:16/BP2A.250605.031.A3/OS3.0.4.0.WNRMIXM:user/release-keys`
+- Package/activity: `dev.aic.m94device/.MainActivity`
+- O0 signed APK SHA-256: `83BFAB9455A48A3AD819F838DFC678765A5868F3DFC9C3D5CC26D05F3F7257AC`
+- O1 signed APK SHA-256: `83BFAB9455A48A3AD819F838DFC678765A5868F3DFC9C3D5CC26D05F3F7257AC`
+- O0/O1 `resources.arsc` SHA-256: `9B80B0F046DA5B54CEE2BDF25E1E59DBEAD93DAED8899EA16D2953CA822D041B`
+- O0/O1 `classes.dex` SHA-256: `2CB64436446CCCF2262CF54CA81EFE03EC414A5BE857816E363859DB17B74D02`
+
+The byte-identical O0/O1 artifacts agree with the deterministic desktop evidence. This closes the focused M9.4 physical-device checklist; it does not replace the exhaustive API/device compatibility matrix required by M9.7.
 
 ## Representative API 35 matrix evidence — 2026-09-14
 

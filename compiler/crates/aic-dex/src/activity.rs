@@ -56,9 +56,11 @@ impl Pool {
             || !program.activity.on_click.is_empty()
             || !program.activity.on_select.is_empty()
             || !program.activity.string_collections.is_empty()
+            || !program.string_resources.is_empty()
             || !program.capabilities.is_empty();
         let key_value = program.capabilities.contains(&Capability::KeyValue);
         let sqlite = program.capabilities.contains(&Capability::Sqlite);
+        let lifecycle = program.capabilities.contains(&Capability::StateRestoration);
         let mut protos = vec![
             Proto {
                 ret: "V",
@@ -280,6 +282,23 @@ impl Pool {
             name: "densityDpi".into(),
             ty: "I".into(),
         });
+        if program.capabilities.contains(&Capability::Adaptive) {
+            fields.push(Field {
+                class: "Landroid/content/res/Configuration;".into(),
+                name: "orientation".into(),
+                ty: "I".into(),
+            });
+            fields.push(Field {
+                class: "Landroid/content/res/Configuration;".into(),
+                name: "screenWidthDp".into(),
+                ty: "I".into(),
+            });
+        }
+        fields.push(Field {
+            class: class.into(),
+            name: "platform$densityDpi".into(),
+            ty: "I".into(),
+        });
         fields.push(Field {
             class: class.into(),
             name: "platform$minimumTouchTarget".into(),
@@ -373,6 +392,22 @@ impl Pool {
             },
             Method {
                 class: "Landroid/content/res/Resources;".into(),
+                name: "getConfiguration".into(),
+                proto: Proto {
+                    ret: "Landroid/content/res/Configuration;",
+                    params: vec![],
+                },
+            },
+            Method {
+                class: "Landroid/content/res/Resources;".into(),
+                name: "getColor".into(),
+                proto: Proto {
+                    ret: "I",
+                    params: vec!["I"],
+                },
+            },
+            Method {
+                class: "Landroid/content/res/Resources;".into(),
                 name: "getDisplayMetrics".into(),
                 proto: Proto {
                     ret: "Landroid/util/DisplayMetrics;",
@@ -403,6 +438,14 @@ impl Pool {
                 },
             },
             Method {
+                class: "Landroid/view/View;".into(),
+                name: "setSaveEnabled".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Z"],
+                },
+            },
+            Method {
                 class: "Landroid/widget/LinearLayout;".into(),
                 name: "<init>".into(),
                 proto: protos[2].clone(),
@@ -421,6 +464,14 @@ impl Pool {
                 class: "Landroid/widget/TextView;".into(),
                 name: "setText".into(),
                 proto: protos[4].clone(),
+            },
+            Method {
+                class: "Landroid/widget/TextView;".into(),
+                name: "setFreezesText".into(),
+                proto: Proto {
+                    ret: "V",
+                    params: vec!["Z"],
+                },
             },
             Method {
                 class: "Landroid/widget/TextView;".into(),
@@ -753,14 +804,6 @@ impl Pool {
             },
             Method {
                 class: "Landroid/view/View;".into(),
-                name: "generateViewId".into(),
-                proto: Proto {
-                    ret: "I",
-                    params: vec![],
-                },
-            },
-            Method {
-                class: "Landroid/view/View;".into(),
                 name: "setId".into(),
                 proto: protos[3].clone(),
             },
@@ -783,6 +826,77 @@ impl Pool {
                 proto: protos[3].clone(),
             },
         ];
+        if lifecycle {
+            let bundle_key = "Ljava/lang/String;";
+            methods.extend([
+                Method {
+                    class: class.to_owned(),
+                    name: "onSaveInstanceState".into(),
+                    proto: protos[1].clone(),
+                },
+                Method {
+                    class: "Landroid/app/Activity;".into(),
+                    name: "onSaveInstanceState".into(),
+                    proto: protos[1].clone(),
+                },
+                Method {
+                    class: "Landroid/os/Bundle;".into(),
+                    name: "containsKey".into(),
+                    proto: Proto {
+                        ret: "Z",
+                        params: vec![bundle_key],
+                    },
+                },
+                Method {
+                    class: "Landroid/os/Bundle;".into(),
+                    name: "getInt".into(),
+                    proto: Proto {
+                        ret: "I",
+                        params: vec![bundle_key, "I"],
+                    },
+                },
+                Method {
+                    class: "Landroid/os/Bundle;".into(),
+                    name: "getBoolean".into(),
+                    proto: Proto {
+                        ret: "Z",
+                        params: vec![bundle_key, "Z"],
+                    },
+                },
+                Method {
+                    class: "Landroid/os/Bundle;".into(),
+                    name: "getString".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/String;",
+                        params: vec![bundle_key, "Ljava/lang/String;"],
+                    },
+                },
+                Method {
+                    class: "Landroid/os/Bundle;".into(),
+                    name: "putInt".into(),
+                    proto: Proto {
+                        ret: "V",
+                        params: vec![bundle_key, "I"],
+                    },
+                },
+                Method {
+                    class: "Landroid/os/Bundle;".into(),
+                    name: "putBoolean".into(),
+                    proto: Proto {
+                        ret: "V",
+                        params: vec![bundle_key, "Z"],
+                    },
+                },
+                Method {
+                    class: "Landroid/os/Bundle;".into(),
+                    name: "putString".into(),
+                    proto: Proto {
+                        ret: "V",
+                        params: vec![bundle_key, "Ljava/lang/String;"],
+                    },
+                },
+            ]);
+        }
         if interactive {
             methods.push(Method {
                 class: class.into(),
@@ -828,6 +942,14 @@ impl Pool {
                 proto: function_proto(function),
             }));
             methods.extend([
+                Method {
+                    class: "Landroid/content/Context;".into(),
+                    name: "getString".into(),
+                    proto: Proto {
+                        ret: "Ljava/lang/String;",
+                        params: vec!["I"],
+                    },
+                },
                 Method {
                     class: "Ljava/lang/String;".into(),
                     name: "valueOf".into(),
@@ -1081,6 +1203,7 @@ impl Pool {
             "Landroid/content/Context;",
             "Landroid/content/Intent;",
             "Landroid/content/res/Resources;",
+            "Landroid/content/res/Configuration;",
             "Landroid/util/DisplayMetrics;",
             "Landroid/os/Bundle;",
             "Landroid/view/View;",
@@ -1127,6 +1250,7 @@ impl Pool {
             "onCreate",
             "setContentView",
             "getResources",
+            "getColor",
             "getDisplayMetrics",
             "densityDpi",
             "platform$minimumTouchTarget",
@@ -1170,16 +1294,37 @@ impl Pool {
             "setEnabled",
             "setContentDescription",
             "setImportantForAccessibility",
-            "generateViewId",
+            "getConfiguration",
             "setId",
+            "setSaveEnabled",
             "setLabelFor",
             "setAccessibilityHeading",
             "Landroid/os/Build$VERSION;",
             "SDK_INT",
             "setTextAlignment",
+            "setFreezesText",
             "F",
         ] {
             strings.insert(value.to_owned());
+        }
+        if lifecycle {
+            for value in [
+                "onSaveInstanceState",
+                "containsKey",
+                "getInt",
+                "getBoolean",
+                "putInt",
+                "putBoolean",
+                "putString",
+            ] {
+                strings.insert(value.to_owned());
+            }
+            for state in &program.activity.state {
+                strings.insert(format!(
+                    "aic.state.{}.{}",
+                    program.activity.name, state.name
+                ));
+            }
         }
         if runtime {
             for value in [
@@ -1194,6 +1339,7 @@ impl Pool {
                 "getText",
                 "matches",
                 "parseInt",
+                "getString",
                 crate::lower::VALID_I32_PATTERN,
             ] {
                 strings.insert(value.into());
@@ -1246,6 +1392,9 @@ impl Pool {
             }
         }
         collect_persistence_sql(&program.activity.on_create, program, &mut strings);
+        for variant in &program.activity.on_create_variants {
+            collect_persistence_sql(&variant.body, program, &mut strings);
+        }
         for handler in &program.activity.on_click {
             collect_persistence_sql(&handler.body, program, &mut strings);
         }
@@ -1394,6 +1543,9 @@ fn collect_program_strings(program: &Program, strings: &mut BTreeSet<String>) {
         collect_statement_strings(&function.body, strings);
     }
     collect_statement_strings(&program.activity.on_create, strings);
+    for variant in &program.activity.on_create_variants {
+        collect_statement_strings(&variant.body, strings);
+    }
     for handler in &program.activity.on_click {
         collect_statement_strings(&handler.body, strings);
     }
@@ -1503,6 +1655,8 @@ fn collect_statement_strings(statements: &[Statement], strings: &mut BTreeSet<St
             | StatementKind::SetPadding { .. }
             | StatementKind::SetVisibility { .. }
             | StatementKind::SetGravity { .. }
+            | StatementKind::SetTextResourceColor { .. }
+            | StatementKind::SetBackgroundResourceColor { .. }
             | StatementKind::FinishActivity => {}
         }
     }
@@ -1524,6 +1678,8 @@ fn collect_expression_strings(expression: &Expression, strings: &mut BTreeSet<St
             }
         }
         ExpressionKind::AndroidText { .. }
+        | ExpressionKind::ResourceString { .. }
+        | ExpressionKind::ResourceColor { .. }
         | ExpressionKind::Literal(_)
         | ExpressionKind::Name(_) => {}
         ExpressionKind::PreferenceGet { key } => {
@@ -1733,7 +1889,8 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
         || !program.activity.state.is_empty()
         || !program.activity.on_click.is_empty()
         || !program.activity.on_select.is_empty()
-        || !program.activity.string_collections.is_empty();
+        || !program.activity.string_collections.is_empty()
+        || !program.string_resources.is_empty();
     let p0 = Proto {
         ret: "V",
         params: vec![],
@@ -1820,6 +1977,14 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                     params: vec!["Ljava/lang/String;"],
                 },
             )?,
+            context_get_string: pool.method(
+                "Landroid/content/Context;",
+                "getString",
+                &Proto {
+                    ret: "Ljava/lang/String;",
+                    params: vec!["I"],
+                },
+            )?,
         })
     } else {
         None
@@ -1866,7 +2031,9 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             .ok_or(DexError::InvalidInput("missing collected string literal"))
             .and_then(|index| u16::try_from(index).map_err(|_| DexError::IndexOverflow("string")))
     };
-    let persistence_lowering = if program.capabilities.is_empty() {
+    let persistence_lowering = if !program.capabilities.contains(&Capability::KeyValue)
+        && !program.capabilities.contains(&Capability::Sqlite)
+    {
         None
     } else {
         Some(crate::lower::PersistenceLowering {
@@ -2021,6 +2188,73 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             )?,
         })
     };
+    let lifecycle_lowering = if program.capabilities.contains(&Capability::StateRestoration) {
+        Some(crate::lower::LifecycleLowering {
+            bundle_contains_key: pool.method(
+                "Landroid/os/Bundle;",
+                "containsKey",
+                &Proto {
+                    ret: "Z",
+                    params: vec!["Ljava/lang/String;"],
+                },
+            )?,
+            bundle_get_i32: pool.method(
+                "Landroid/os/Bundle;",
+                "getInt",
+                &Proto {
+                    ret: "I",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+            )?,
+            bundle_get_bool: pool.method(
+                "Landroid/os/Bundle;",
+                "getBoolean",
+                &Proto {
+                    ret: "Z",
+                    params: vec!["Ljava/lang/String;", "Z"],
+                },
+            )?,
+            bundle_get_string: pool.method(
+                "Landroid/os/Bundle;",
+                "getString",
+                &Proto {
+                    ret: "Ljava/lang/String;",
+                    params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                },
+            )?,
+            bundle_put_i32: pool.method(
+                "Landroid/os/Bundle;",
+                "putInt",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Ljava/lang/String;", "I"],
+                },
+            )?,
+            bundle_put_bool: pool.method(
+                "Landroid/os/Bundle;",
+                "putBoolean",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Ljava/lang/String;", "Z"],
+                },
+            )?,
+            bundle_put_string: pool.method(
+                "Landroid/os/Bundle;",
+                "putString",
+                &Proto {
+                    ret: "V",
+                    params: vec!["Ljava/lang/String;", "Ljava/lang/String;"],
+                },
+            )?,
+            activity_on_save_instance_state: pool.method(
+                "Landroid/app/Activity;",
+                "onSaveInstanceState",
+                &pb,
+            )?,
+        })
+    } else {
+        None
+    };
     let preferences = &program.preferences;
     let tables = program
         .database
@@ -2028,11 +2262,17 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
         .map_or(&[][..], |database| database.tables.as_slice());
     let create = crate::lower_on_create(
         &program.activity.on_create,
+        &program.activity.on_create_variants,
+        &program.activity.name,
         &resolve_target,
         &resolve_string,
         string_lowering,
         crate::UiLowering {
             activity_on_create: pool.method("Landroid/app/Activity;", "onCreate", &pb)?,
+            context_get_resources: pool.method("Landroid/content/Context;", "getResources", &Proto { ret: "Landroid/content/res/Resources;", params: vec![] })?,
+            resources_get_configuration: pool.method("Landroid/content/res/Resources;", "getConfiguration", &Proto { ret: "Landroid/content/res/Configuration;", params: vec![] })?,
+            configuration_orientation: pool.field("Landroid/content/res/Configuration;", "orientation").ok(),
+            configuration_screen_width_dp: pool.field("Landroid/content/res/Configuration;", "screenWidthDp").ok(),
             linear_layout_type: pool.type_index["Landroid/widget/LinearLayout;"],
             linear_layout_init: pool.method("Landroid/widget/LinearLayout;", "<init>", &pc)?,
             linear_layout_orientation: pool.method(
@@ -2048,6 +2288,7 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 "setTextSize",
                 &Proto { ret: "V", params: vec!["I", "F"] },
             )?,
+            text_view_set_freezes_text: pool.method("Landroid/widget/TextView;", "setFreezesText", &Proto { ret: "V", params: vec!["Z"] })?,
             button_type: pool.type_index["Landroid/widget/Button;"],
             button_init: pool.method("Landroid/widget/Button;", "<init>", &pc)?,
             edit_text_type: pool.type_index["Landroid/widget/EditText;"],
@@ -2240,10 +2481,10 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 "setImportantForAccessibility",
                 &pi,
             )?,
-            context_get_resources: pool.method(
-                "Landroid/content/Context;",
-                "getResources",
-                &Proto { ret: "Landroid/content/res/Resources;", params: vec![] },
+            resources_get_color: pool.method(
+                "Landroid/content/res/Resources;",
+                "getColor",
+                &Proto { ret: "I", params: vec!["I"] },
             )?,
             resources_get_display_metrics: pool.method(
                 "Landroid/content/res/Resources;",
@@ -2254,15 +2495,12 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                 "Landroid/util/DisplayMetrics;",
                 "densityDpi",
             )?,
+            density_dpi_field: pool.field(class, "platform$densityDpi")?,
             minimum_touch_target_field: pool.field(class, "platform$minimumTouchTarget")?,
             set_minimum_width: pool.method("Landroid/view/View;", "setMinimumWidth", &pi)?,
             set_minimum_height: pool.method("Landroid/view/View;", "setMinimumHeight", &pi)?,
-            generate_view_id: pool.method(
-                "Landroid/view/View;",
-                "generateViewId",
-                &Proto { ret: "I", params: vec![] },
-            )?,
             set_view_id: pool.method("Landroid/view/View;", "setId", &pi)?,
+            set_save_enabled: pool.method("Landroid/view/View;", "setSaveEnabled", &Proto { ret: "V", params: vec!["Z"] })?,
             text_view_set_label_for: pool.method(
                 "Landroid/widget/TextView;",
                 "setLabelFor",
@@ -2355,10 +2593,32 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             .collect::<Result<BTreeMap<_, _>, DexError>>()?,
         &program.activity.state,
         &program.activity.string_collections,
+        lifecycle_lowering,
         persistence_lowering,
         preferences,
         tables,
     )?;
+    let save = lifecycle_lowering
+        .map(|lifecycle| {
+            crate::lower::lower_on_save_instance_state(
+                &program.activity.state,
+                &program.activity.name,
+                &resolve_string,
+                &program
+                    .activity
+                    .state
+                    .iter()
+                    .map(|state| {
+                        Ok((
+                            state.name.clone(),
+                            (pool.field(class, &state.name)?, state.ty),
+                        ))
+                    })
+                    .collect::<Result<BTreeMap<_, _>, DexError>>()?,
+                lifecycle,
+            )
+        })
+        .transpose()?;
     let events = if program.activity.on_click.is_empty() && program.activity.on_select.is_empty() {
         None
     } else {
@@ -2370,6 +2630,10 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
             string_lowering,
             crate::UiLowering {
                 activity_on_create: pool.method("Landroid/app/Activity;", "onCreate", &pb)?,
+                context_get_resources: pool.method("Landroid/content/Context;", "getResources", &Proto { ret: "Landroid/content/res/Resources;", params: vec![] })?,
+                resources_get_configuration: pool.method("Landroid/content/res/Resources;", "getConfiguration", &Proto { ret: "Landroid/content/res/Configuration;", params: vec![] })?,
+                configuration_orientation: pool.field("Landroid/content/res/Configuration;", "orientation").ok(),
+                configuration_screen_width_dp: pool.field("Landroid/content/res/Configuration;", "screenWidthDp").ok(),
                 linear_layout_type: pool.type_index["Landroid/widget/LinearLayout;"],
                 linear_layout_init: pool.method("Landroid/widget/LinearLayout;", "<init>", &pc)?,
                 linear_layout_orientation: pool.method(
@@ -2385,6 +2649,7 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                     "setTextSize",
                     &Proto { ret: "V", params: vec!["I", "F"] },
                 )?,
+                text_view_set_freezes_text: pool.method("Landroid/widget/TextView;", "setFreezesText", &Proto { ret: "V", params: vec!["Z"] })?,
                 button_type: pool.type_index["Landroid/widget/Button;"],
                 button_init: pool.method("Landroid/widget/Button;", "<init>", &pc)?,
                 edit_text_type: pool.type_index["Landroid/widget/EditText;"],
@@ -2581,10 +2846,10 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                     "setImportantForAccessibility",
                     &pi,
                 )?,
-                context_get_resources: pool.method(
-                    "Landroid/content/Context;",
-                    "getResources",
-                    &Proto { ret: "Landroid/content/res/Resources;", params: vec![] },
+                resources_get_color: pool.method(
+                    "Landroid/content/res/Resources;",
+                    "getColor",
+                    &Proto { ret: "I", params: vec!["I"] },
                 )?,
                 resources_get_display_metrics: pool.method(
                     "Landroid/content/res/Resources;",
@@ -2595,15 +2860,12 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
                     "Landroid/util/DisplayMetrics;",
                     "densityDpi",
                 )?,
+                density_dpi_field: pool.field(class, "platform$densityDpi")?,
                 minimum_touch_target_field: pool.field(class, "platform$minimumTouchTarget")?,
                 set_minimum_width: pool.method("Landroid/view/View;", "setMinimumWidth", &pi)?,
                 set_minimum_height: pool.method("Landroid/view/View;", "setMinimumHeight", &pi)?,
-                generate_view_id: pool.method(
-                    "Landroid/view/View;",
-                    "generateViewId",
-                    &Proto { ret: "I", params: vec![] },
-                )?,
                 set_view_id: pool.method("Landroid/view/View;", "setId", &pi)?,
+                set_save_enabled: pool.method("Landroid/view/View;", "setSaveEnabled", &Proto { ret: "V", params: vec!["Z"] })?,
                 text_view_set_label_for: pool.method(
                     "Landroid/widget/TextView;",
                     "setLabelFor",
@@ -2772,6 +3034,9 @@ fn encode(pool: &Pool, class: &str, program: &Program) -> Result<Vec<u8>, DexErr
         params: vec!["Landroid/widget/AdapterView;"],
     };
     let mut event_methods: Vec<(&str, Proto, &crate::LoweredMethod)> = Vec::new();
+    if let Some(method) = &save {
+        event_methods.push(("onSaveInstanceState", pb.clone(), method));
+    }
     if let Some(e) = &events {
         if let Some(m) = &e.click {
             event_methods.push(("onClick", pv.clone(), m));

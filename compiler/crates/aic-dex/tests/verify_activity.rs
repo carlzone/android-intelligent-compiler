@@ -196,7 +196,7 @@ fn m3_emits_activity_fields_and_click_dispatch() {
     let source = include_str!("../../../testdata/counter.aic");
     let program = parse_program(source).unwrap();
     let bytes = encode_activity_dex(&program).unwrap();
-    assert_eq!(u32_at(&bytes, 80), 8);
+    assert_eq!(u32_at(&bytes, 80), 9);
     assert!(bytes.windows(7).any(|value| value == b"onClick"));
     assert!(bytes.windows(5).any(|value| value == b"count"));
     assert!(bytes.windows(2).any(|word| word[0] == 0x52)); // iget
@@ -280,6 +280,9 @@ fn m9_emits_bounded_dimensions_and_margins() {
     assert!(bytes
         .windows("setMargins".len())
         .any(|value| value == b"setMargins"));
+    assert!(bytes
+        .windows("platform$densityDpi".len())
+        .any(|value| value == b"platform$densityDpi"));
     assert_eq!(bytes, encode_activity_dex(&program).unwrap());
 }
 
@@ -470,13 +473,7 @@ fn m9_emits_input_labels_and_guarded_headings_deterministically() {
         let optimized = optimize(program.clone(), options);
         let bytes = encode_activity_dex(&optimized).unwrap();
         assert_strict_method_id_order(&bytes);
-        for symbol in [
-            "generateViewId",
-            "setId",
-            "setLabelFor",
-            "SDK_INT",
-            "setAccessibilityHeading",
-        ] {
+        for symbol in ["setId", "setLabelFor", "SDK_INT", "setAccessibilityHeading"] {
             assert!(
                 bytes
                     .windows(symbol.len())
@@ -571,5 +568,70 @@ fn m9_emits_declared_ui_surface_deterministically() {
         for dex in &dexes {
             assert_strict_method_id_order(dex);
         }
+    }
+}
+
+#[test]
+fn m9_emits_direct_typed_resource_calls_deterministically() {
+    let parsed = parse_program(include_str!("../../../testdata/m9-resources.aic")).unwrap();
+    for options in [
+        CompilerOptions {
+            optimization_level: aic_opt::OptimizationLevel::None,
+        },
+        CompilerOptions::default(),
+    ] {
+        let optimized = optimize(parsed.clone(), options);
+        let bytes = encode_activity_dex(&optimized).unwrap();
+        for symbol in ["getString", "getColor", "setTextColor"] {
+            assert!(
+                bytes
+                    .windows(symbol.len())
+                    .any(|window| window == symbol.as_bytes()),
+                "missing {symbol}"
+            );
+        }
+        assert!(!bytes
+            .windows("java/lang/reflect".len())
+            .any(|window| window == b"java/lang/reflect"));
+        assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
+        assert_strict_method_id_order(&bytes);
+    }
+}
+
+#[test]
+fn m9_emits_adaptive_dispatch_and_lifecycle() {
+    let parsed =
+        parse_program(include_str!("../../../testdata/m9-adaptive-lifecycle.aic")).unwrap();
+    for options in [
+        CompilerOptions {
+            optimization_level: aic_opt::OptimizationLevel::None,
+        },
+        CompilerOptions::default(),
+    ] {
+        let optimized = optimize(parsed.clone(), options);
+        let bytes = encode_activity_dex(&optimized).unwrap();
+        for symbol in [
+            "getConfiguration",
+            "orientation",
+            "screenWidthDp",
+            "onSaveInstanceState",
+            "containsKey",
+            "putInt",
+            "putBoolean",
+            "putString",
+            "setSaveEnabled",
+        ] {
+            assert!(
+                bytes
+                    .windows(symbol.len())
+                    .any(|window| window == symbol.as_bytes()),
+                "missing {symbol}"
+            );
+        }
+        assert!(!bytes
+            .windows("java/lang/reflect".len())
+            .any(|window| window == b"java/lang/reflect"));
+        assert_eq!(bytes, encode_activity_dex(&optimized).unwrap());
+        assert_strict_method_id_order(&bytes);
     }
 }

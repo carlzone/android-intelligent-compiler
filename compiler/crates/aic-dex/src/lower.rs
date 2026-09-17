@@ -133,10 +133,15 @@ pub struct StringLowering {
     pub object_to_string: u16,
     pub string_matches: u16,
     pub integer_parse_int: u16,
+    pub context_get_string: u16,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct UiLowering {
     pub activity_on_create: u16,
+    pub context_get_resources: u16,
+    pub resources_get_configuration: u16,
+    pub configuration_orientation: Option<u16>,
+    pub configuration_screen_width_dp: Option<u16>,
     pub linear_layout_type: u16,
     pub linear_layout_init: u16,
     pub linear_layout_orientation: u16,
@@ -144,6 +149,7 @@ pub struct UiLowering {
     pub text_view_init: u16,
     pub text_view_set_text: u16,
     pub text_view_set_text_size: u16,
+    pub text_view_set_freezes_text: u16,
     pub button_type: u16,
     pub button_init: u16,
     pub edit_text_type: u16,
@@ -204,14 +210,15 @@ pub struct UiLowering {
     pub set_enabled: u16,
     pub set_content_description: u16,
     pub set_important_for_accessibility: u16,
-    pub context_get_resources: u16,
+    pub resources_get_color: u16,
     pub resources_get_display_metrics: u16,
     pub display_metrics_density_dpi: u16,
+    pub density_dpi_field: u16,
     pub minimum_touch_target_field: u16,
     pub set_minimum_width: u16,
     pub set_minimum_height: u16,
-    pub generate_view_id: u16,
     pub set_view_id: u16,
+    pub set_save_enabled: u16,
     pub text_view_set_label_for: u16,
     pub set_accessibility_heading: u16,
     pub sdk_int_field: Option<u16>,
@@ -249,6 +256,17 @@ pub struct PersistenceLowering {
     pub statement_simple_string: u16,
     pub statement_execute_update_delete: u16,
     pub statement_close: u16,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct LifecycleLowering {
+    pub bundle_contains_key: u16,
+    pub bundle_get_i32: u16,
+    pub bundle_get_bool: u16,
+    pub bundle_get_string: u16,
+    pub bundle_put_i32: u16,
+    pub bundle_put_bool: u16,
+    pub bundle_put_string: u16,
+    pub activity_on_save_instance_state: u16,
 }
 #[derive(Clone, Copy)]
 struct Binding {
@@ -344,6 +362,14 @@ impl Lowerer<'_> {
             object: metrics,
             field: ui.display_metrics_density_dpi,
         });
+        let this = self
+            .this
+            .ok_or(DexError::InvalidInput("missing Activity receiver"))?;
+        self.code.push(Instruction::IPut {
+            src: scratch,
+            object: this,
+            field: ui.density_dpi_field,
+        });
         self.code.push(Instruction::Const16 {
             dst: target,
             value: 48,
@@ -371,9 +397,6 @@ impl Lowerer<'_> {
             left: target,
             right: scratch,
         });
-        let this = self
-            .this
-            .ok_or(DexError::InvalidInput("missing Activity receiver"))?;
         self.code.push(Instruction::IPut {
             src: target,
             object: this,
@@ -404,6 +427,43 @@ impl Lowerer<'_> {
                 args: vec![view, target],
             });
         }
+        self.outs = self.outs.max(2);
+        self.release_temporaries(view.index + 1);
+        Ok(())
+    }
+    fn assign_view_id(
+        &mut self,
+        name: &str,
+        view: Register,
+        ui: UiLowering,
+    ) -> Result<(), DexError> {
+        let id = self.alloc(Type::I32)?;
+        let field = *self
+            .view_fields
+            .get(name)
+            .ok_or(DexError::InvalidInput("missing stable view field"))?;
+        self.code.push(Instruction::Const32 {
+            dst: id,
+            value: 0x00a1_0000 | i32::from(field),
+        });
+        self.code.push(Instruction::InvokeVirtual {
+            method: ui.set_view_id,
+            args: vec![view, id],
+        });
+        self.outs = self.outs.max(2);
+        self.release_temporaries(view.index + 1);
+        Ok(())
+    }
+    fn enable_text_state(&mut self, view: Register, ui: UiLowering) -> Result<(), DexError> {
+        let enabled = self.alloc(Type::Bool)?;
+        self.code.push(Instruction::Const4 {
+            dst: enabled,
+            value: 1,
+        });
+        self.code.push(Instruction::InvokeVirtual {
+            method: ui.text_view_set_freezes_text,
+            args: vec![view, enabled],
+        });
         self.outs = self.outs.max(2);
         self.release_temporaries(view.index + 1);
         Ok(())
@@ -440,13 +500,17 @@ impl Lowerer<'_> {
             ExpressionKind::Call { name, .. } => self
                 .target
                 .map_or(Ok(Type::I32), |resolve| Ok(resolve(name)?.result)),
-            ExpressionKind::AndroidText { .. } => Ok(Type::String),
+            ExpressionKind::AndroidText { .. } | ExpressionKind::ResourceString { .. } => {
+                Ok(Type::String)
+            }
             ExpressionKind::PreferenceGet { key } => self
                 .preferences
                 .get(key)
                 .map(|p| p.ty)
                 .ok_or(DexError::InvalidInput("unknown preference")),
-            ExpressionKind::DatabaseInsert { .. } => Ok(Type::I32),
+            ExpressionKind::DatabaseInsert { .. } | ExpressionKind::ResourceColor { .. } => {
+                Ok(Type::I32)
+            }
             ExpressionKind::DatabaseExists { .. } => Ok(Type::Bool),
             ExpressionKind::DatabaseGet { table, column, .. } => self
                 .tables
@@ -506,6 +570,29 @@ impl Lowerer<'_> {
                     string: index,
                 });
             }
+            ExpressionKind::ResourceString { id, .. } => {
+                let this = self.this.ok_or(DexError::InvalidInput(
+                    "resource string requires Activity receiver",
+                ))?;
+                let resource = self.alloc(Type::I32)?;
+                self.code.push(Instruction::Const32 {
+                    dst: resource,
+                    value: (*id).cast_signed(),
+                });
+                let strings = self.strings.ok_or(DexError::InvalidInput(
+                    "resource string lowering unavailable",
+                ))?;
+                self.code.push(Instruction::InvokeVirtual {
+                    method: strings.context_get_string,
+                    args: vec![this, resource],
+                });
+                self.code.push(Instruction::MoveResultObject { dst: d });
+                self.outs = self.outs.max(2);
+            }
+            ExpressionKind::ResourceColor { id, .. } => self.code.push(Instruction::Const32 {
+                dst: d,
+                value: (*id).cast_signed(),
+            }),
             ExpressionKind::Name(n) => {
                 if let Some(local) = self.locals.get(n) {
                     self.mov(d, local.register)?;
@@ -1456,6 +1543,7 @@ impl Lowerer<'_> {
                     });
                     self.outs = self.outs.max(2);
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1482,7 +1570,9 @@ impl Lowerer<'_> {
                         args: vec![view, rendered],
                     });
                     self.outs = self.outs.max(2);
+                    self.enable_text_state(view, ui)?;
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1511,7 +1601,9 @@ impl Lowerer<'_> {
                     self.outs = self.outs.max(2);
                     self.release_temporaries(rendered.index);
                     self.apply_minimum_touch_target(view, ui)?;
+                    self.enable_text_state(view, ui)?;
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1579,9 +1671,28 @@ impl Lowerer<'_> {
                         method: ui.edit_text_set_input_type,
                         args: vec![view, input_type],
                     });
+                    if matches!(
+                        &statement.kind,
+                        StatementKind::TextInput {
+                            input_type: aic_ir::InputType::Password,
+                            ..
+                        }
+                    ) {
+                        let disabled = self.alloc(Type::Bool)?;
+                        self.code.push(Instruction::Const4 {
+                            dst: disabled,
+                            value: 0,
+                        });
+                        self.code.push(Instruction::InvokeVirtual {
+                            method: ui.set_save_enabled,
+                            args: vec![view, disabled],
+                        });
+                    }
                     self.outs = self.outs.max(2);
                     self.apply_minimum_touch_target(view, ui)?;
+                    self.enable_text_state(view, ui)?;
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1603,6 +1714,7 @@ impl Lowerer<'_> {
                     });
                     self.outs = self.outs.max(2);
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1629,14 +1741,21 @@ impl Lowerer<'_> {
                         method: init,
                         args: vec![view, this],
                     });
-                    if let StatementKind::ImageView { icon, .. } = &statement.kind {
+                    if let StatementKind::ImageView { source, .. } = &statement.kind {
                         let resource = self.alloc(Type::I32)?;
                         self.code.push(Instruction::Const32 {
                             dst: resource,
-                            value: match icon {
-                                aic_ir::BuiltinIcon::Info => 0x0108_009b,
-                                aic_ir::BuiltinIcon::Warning => 0x0108_0027,
-                                aic_ir::BuiltinIcon::Delete => 0x0108_0040,
+                            value: match source {
+                                aic_ir::ImageSource::Builtin(aic_ir::BuiltinIcon::Info) => {
+                                    0x0108_009b
+                                }
+                                aic_ir::ImageSource::Builtin(aic_ir::BuiltinIcon::Warning) => {
+                                    0x0108_0027
+                                }
+                                aic_ir::ImageSource::Builtin(aic_ir::BuiltinIcon::Delete) => {
+                                    0x0108_0040
+                                }
+                                aic_ir::ImageSource::Resource { id, .. } => (*id).cast_signed(),
                             },
                         });
                         self.code.push(Instruction::InvokeVirtual {
@@ -1646,6 +1765,7 @@ impl Lowerer<'_> {
                     }
                     self.outs = self.outs.max(2);
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1675,7 +1795,9 @@ impl Lowerer<'_> {
                     });
                     self.outs = self.outs.max(2);
                     self.apply_minimum_touch_target(view, ui)?;
+                    self.enable_text_state(view, ui)?;
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1704,6 +1826,7 @@ impl Lowerer<'_> {
                     self.outs = self.outs.max(2);
                     self.apply_minimum_touch_target(view, ui)?;
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1755,6 +1878,7 @@ impl Lowerer<'_> {
                     self.outs = self.outs.max(4);
                     self.apply_minimum_touch_target(view, ui)?;
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1820,6 +1944,7 @@ impl Lowerer<'_> {
                     self.outs = self.outs.max(4);
                     self.apply_minimum_touch_target(view, ui)?;
                     self.views.insert(id.clone(), view);
+                    self.assign_view_id(id, view, ui)?;
                     if let Some(field) = self.view_fields.get(id) {
                         self.code.push(Instruction::IPut {
                             src: view,
@@ -1958,6 +2083,34 @@ impl Lowerer<'_> {
                                     dst: register,
                                     value: *value,
                                 });
+                                self.code.push(Instruction::IGet {
+                                    dst: weight_register,
+                                    object: this,
+                                    field: ui.density_dpi_field,
+                                });
+                                self.code.push(Instruction::MulInt {
+                                    dst: register,
+                                    left: register,
+                                    right: weight_register,
+                                });
+                                self.code.push(Instruction::Const16 {
+                                    dst: weight_register,
+                                    value: 159,
+                                });
+                                self.code.push(Instruction::AddInt {
+                                    dst: register,
+                                    left: register,
+                                    right: weight_register,
+                                });
+                                self.code.push(Instruction::Const16 {
+                                    dst: weight_register,
+                                    value: 160,
+                                });
+                                self.code.push(Instruction::DivInt {
+                                    dst: register,
+                                    left: register,
+                                    right: weight_register,
+                                });
                                 if enforces_touch_target {
                                     let done = self.label();
                                     self.code.push(Instruction::IGet {
@@ -1989,11 +2142,40 @@ impl Lowerer<'_> {
                     });
                     if margins.iter().any(|margin| *margin != 0) {
                         let mut margin_args = vec![params];
+                        let density = self.alloc(Type::I32)?;
                         for margin in margins {
                             let register = self.alloc(Type::I32)?;
                             self.code.push(Instruction::Const32 {
                                 dst: register,
                                 value: *margin,
+                            });
+                            self.code.push(Instruction::IGet {
+                                dst: density,
+                                object: this,
+                                field: ui.density_dpi_field,
+                            });
+                            self.code.push(Instruction::MulInt {
+                                dst: register,
+                                left: register,
+                                right: density,
+                            });
+                            self.code.push(Instruction::Const16 {
+                                dst: density,
+                                value: 159,
+                            });
+                            self.code.push(Instruction::AddInt {
+                                dst: register,
+                                left: register,
+                                right: density,
+                            });
+                            self.code.push(Instruction::Const16 {
+                                dst: density,
+                                value: 160,
+                            });
+                            self.code.push(Instruction::DivInt {
+                                dst: register,
+                                left: register,
+                                right: density,
                             });
                             margin_args.push(register);
                         }
@@ -2123,6 +2305,44 @@ impl Lowerer<'_> {
                     self.outs = self.outs.max(5);
                     self.release_temporaries(view.index + 1);
                 }
+                StatementKind::SetTextResourceColor { view, id, .. }
+                | StatementKind::SetBackgroundResourceColor { view, id, .. } => {
+                    let view = *self
+                        .views
+                        .get(view)
+                        .ok_or(DexError::InvalidInput("unknown color target"))?;
+                    let resources = self.alloc(Type::String)?;
+                    let resource_id = self.alloc(Type::I32)?;
+                    let color = self.alloc(Type::I32)?;
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.context_get_resources,
+                        args: vec![this],
+                    });
+                    self.code
+                        .push(Instruction::MoveResultObject { dst: resources });
+                    self.code.push(Instruction::Const32 {
+                        dst: resource_id,
+                        value: (*id).cast_signed(),
+                    });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: ui.resources_get_color,
+                        args: vec![resources, resource_id],
+                    });
+                    self.code.push(Instruction::MoveResult { dst: color });
+                    self.code.push(Instruction::InvokeVirtual {
+                        method: if matches!(
+                            &statement.kind,
+                            StatementKind::SetTextResourceColor { .. }
+                        ) {
+                            ui.set_text_color
+                        } else {
+                            ui.set_background_color
+                        },
+                        args: vec![view, color],
+                    });
+                    self.outs = self.outs.max(2);
+                    self.release_temporaries(view.index + 1);
+                }
                 StatementKind::SetVisibility { view, visibility } => {
                     let view = self.load_view(view, this)?;
                     let value = self.alloc(Type::I32)?;
@@ -2179,13 +2399,17 @@ impl Lowerer<'_> {
                 }
                 StatementKind::SetInputLabel { label, input } => {
                     let label = self.load_view(label, this)?;
-                    let input = self.load_view(input, this)?;
+                    let input_name = input;
+                    let input = self.load_view(input_name, this)?;
                     let id = self.alloc(Type::I32)?;
-                    self.code.push(Instruction::InvokeStatic {
-                        method: ui.generate_view_id,
-                        args: vec![],
+                    let field = *self
+                        .view_fields
+                        .get(input_name)
+                        .ok_or(DexError::InvalidInput("missing stable input field"))?;
+                    self.code.push(Instruction::Const32 {
+                        dst: id,
+                        value: 0x00a1_0000 | i32::from(field),
                     });
-                    self.code.push(Instruction::MoveResult { dst: id });
                     self.code.push(Instruction::InvokeVirtual {
                         method: ui.set_view_id,
                         args: vec![input, id],
@@ -2662,6 +2886,8 @@ pub fn lower_on_select(
 #[allow(clippy::too_many_arguments)]
 pub fn lower_on_create(
     statements: &[Statement],
+    variants: &[aic_ir::CreateVariant],
+    activity_name: &str,
     target: &dyn Fn(&str) -> Result<FunctionTarget, DexError>,
     string_index: &dyn Fn(&str) -> Result<u16, DexError>,
     strings: Option<StringLowering>,
@@ -2672,6 +2898,7 @@ pub fn lower_on_create(
     view_fields: BTreeMap<String, u16>,
     states: &[aic_ir::State],
     string_collections: &[aic_ir::StringCollectionState],
+    lifecycle: Option<LifecycleLowering>,
     persistence: Option<PersistenceLowering>,
     preferences: &[Preference],
     tables: &[Table],
@@ -2679,6 +2906,7 @@ pub fn lower_on_create(
     let fallback = |name: &str| Ok(target(name)?.method);
     let touch_target_views = statements
         .iter()
+        .chain(variants.iter().flat_map(|variant| variant.body.iter()))
         .filter_map(|statement| match &statement.kind {
             StatementKind::Button { id, .. }
             | StatementKind::EditText { id, .. }
@@ -2845,16 +3073,218 @@ pub fn lower_on_create(
         });
         lowerer.next = 0;
     }
-    if !lowerer.touch_target_views.is_empty() {
-        lowerer.initialize_minimum_touch_target(this, ui)?;
+    if let Some(lifecycle) = lifecycle {
+        let no_bundle = lowerer.label();
+        let has_bundle = lowerer.label();
+        let null = lowerer.alloc(Type::String)?;
+        lowerer.code.push(Instruction::ConstNull { dst: null });
+        lowerer.code.push(Instruction::IfNe {
+            left: bundle,
+            right: null,
+            target: has_bundle,
+        });
+        lowerer.code.push(Instruction::Goto16 { target: no_bundle });
+        lowerer.code.push(Instruction::Label(has_bundle));
+        lowerer.next = 0;
+        for state in states {
+            let key = lowerer.alloc(Type::String)?;
+            let present = lowerer.alloc(Type::Bool)?;
+            let value = lowerer.alloc(state.ty)?;
+            let next = lowerer.label();
+            lowerer.code.push(Instruction::ConstString {
+                dst: key,
+                string: string_index(&format!("aic.state.{activity_name}.{}", state.name))?,
+            });
+            lowerer.code.push(Instruction::InvokeVirtual {
+                method: lifecycle.bundle_contains_key,
+                args: vec![bundle, key],
+            });
+            lowerer.code.push(Instruction::MoveResult { dst: present });
+            lowerer.code.push(Instruction::IfEqz {
+                value: present,
+                target: next,
+            });
+            lowerer.code.push(Instruction::IGet {
+                dst: value,
+                object: this,
+                field: lowerer.state_fields[&state.name].0,
+            });
+            lowerer.code.push(Instruction::InvokeVirtual {
+                method: match state.ty {
+                    Type::I32 => lifecycle.bundle_get_i32,
+                    Type::Bool => lifecycle.bundle_get_bool,
+                    Type::String => lifecycle.bundle_get_string,
+                },
+                args: vec![bundle, key, value],
+            });
+            lowerer.code.push(if state.ty == Type::String {
+                Instruction::MoveResultObject { dst: value }
+            } else {
+                Instruction::MoveResult { dst: value }
+            });
+            lowerer.code.push(Instruction::IPut {
+                src: value,
+                object: this,
+                field: lowerer.state_fields[&state.name].0,
+            });
+            lowerer.code.push(Instruction::Label(next));
+            lowerer.next = 0;
+        }
+        lowerer.code.push(Instruction::Label(no_bundle));
     }
-    lowerer.on_create_statements(statements, this, ui)?;
+    lowerer.initialize_minimum_touch_target(this, ui)?;
+    if variants.is_empty() {
+        lowerer.on_create_statements(statements, this, ui)?;
+    } else {
+        let resources = lowerer.alloc(Type::String)?;
+        let configuration = lowerer.alloc(Type::String)?;
+        let orientation = lowerer.alloc(Type::I32)?;
+        let width = lowerer.alloc(Type::I32)?;
+        let portrait = lowerer.alloc(Type::I32)?;
+        let landscape = lowerer.alloc(Type::I32)?;
+        let breakpoint = lowerer.alloc(Type::I32)?;
+        lowerer.code.push(Instruction::InvokeVirtual {
+            method: ui.context_get_resources,
+            args: vec![this],
+        });
+        lowerer
+            .code
+            .push(Instruction::MoveResultObject { dst: resources });
+        lowerer.code.push(Instruction::InvokeVirtual {
+            method: ui.resources_get_configuration,
+            args: vec![resources],
+        });
+        lowerer
+            .code
+            .push(Instruction::MoveResultObject { dst: configuration });
+        lowerer.code.push(Instruction::IGet {
+            dst: orientation,
+            object: configuration,
+            field: ui
+                .configuration_orientation
+                .ok_or(DexError::InvalidInput("missing adaptive orientation field"))?,
+        });
+        lowerer.code.push(Instruction::IGet {
+            dst: width,
+            object: configuration,
+            field: ui
+                .configuration_screen_width_dp
+                .ok_or(DexError::InvalidInput("missing adaptive width field"))?,
+        });
+        lowerer.code.push(Instruction::Const4 {
+            dst: portrait,
+            value: 1,
+        });
+        lowerer.code.push(Instruction::Const4 {
+            dst: landscape,
+            value: 2,
+        });
+        lowerer.code.push(Instruction::Const16 {
+            dst: breakpoint,
+            value: 600,
+        });
+        let end = lowerer.label();
+        let arms = variants.iter().map(|_| lowerer.label()).collect::<Vec<_>>();
+        for (variant, arm) in variants.iter().zip(&arms) {
+            let next = lowerer.label();
+            match variant.orientation {
+                aic_ir::DeviceOrientation::Portrait => lowerer.code.push(Instruction::IfNe {
+                    left: orientation,
+                    right: portrait,
+                    target: next,
+                }),
+                aic_ir::DeviceOrientation::Landscape => lowerer.code.push(Instruction::IfNe {
+                    left: orientation,
+                    right: landscape,
+                    target: next,
+                }),
+            }
+            match variant.window {
+                aic_ir::WindowClass::Compact => lowerer.code.push(Instruction::IfLt {
+                    left: width,
+                    right: breakpoint,
+                    target: *arm,
+                }),
+                aic_ir::WindowClass::Expanded => lowerer.code.push(Instruction::IfGe {
+                    left: width,
+                    right: breakpoint,
+                    target: *arm,
+                }),
+            }
+            lowerer.code.push(Instruction::Label(next));
+        }
+        lowerer.code.push(Instruction::Goto16 { target: arms[0] });
+        for (variant, arm) in variants.iter().zip(arms) {
+            lowerer.code.push(Instruction::Label(arm));
+            lowerer.next = 0;
+            lowerer.locals.clear();
+            lowerer.views.clear();
+            lowerer.on_create_statements(&variant.body, this, ui)?;
+            lowerer.code.push(Instruction::Goto16 { target: end });
+        }
+        lowerer.code.push(Instruction::Label(end));
+    }
     lowerer.code.push(Instruction::ReturnVoid);
     Ok(LoweredMethod {
         code: assemble(&lowerer.code)?,
         registers: 16,
         ins: 2,
         outs: lowerer.outs,
+    })
+}
+
+pub fn lower_on_save_instance_state(
+    states: &[aic_ir::State],
+    activity_name: &str,
+    string_index: &dyn Fn(&str) -> Result<u16, DexError>,
+    state_fields: &BTreeMap<String, (u16, Type)>,
+    lifecycle: LifecycleLowering,
+) -> Result<LoweredMethod, DexError> {
+    let this = Register {
+        index: 14,
+        kind: ValueKind::Reference,
+    };
+    let bundle = Register {
+        index: 15,
+        kind: ValueKind::Reference,
+    };
+    let mut code = vec![Instruction::InvokeSuper {
+        method: lifecycle.activity_on_save_instance_state,
+        args: vec![this, bundle],
+    }];
+    for state in states {
+        let key = Register {
+            index: 0,
+            kind: ValueKind::Reference,
+        };
+        let value = Register {
+            index: 1,
+            kind: kind(state.ty),
+        };
+        code.push(Instruction::ConstString {
+            dst: key,
+            string: string_index(&format!("aic.state.{activity_name}.{}", state.name))?,
+        });
+        code.push(Instruction::IGet {
+            dst: value,
+            object: this,
+            field: state_fields[&state.name].0,
+        });
+        code.push(Instruction::InvokeVirtual {
+            method: match state.ty {
+                Type::I32 => lifecycle.bundle_put_i32,
+                Type::Bool => lifecycle.bundle_put_bool,
+                Type::String => lifecycle.bundle_put_string,
+            },
+            args: vec![bundle, key, value],
+        });
+    }
+    code.push(Instruction::ReturnVoid);
+    Ok(LoweredMethod {
+        code: assemble(&code)?,
+        registers: 16,
+        ins: 2,
+        outs: 3,
     })
 }
 
@@ -2926,6 +3356,7 @@ mod tests {
                 object_to_string: 18,
                 string_matches: 19,
                 integer_parse_int: 20,
+                context_get_string: 21,
             },
         )
         .unwrap();

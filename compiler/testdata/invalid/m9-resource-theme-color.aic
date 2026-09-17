@@ -1,0 +1,10 @@
+aic_version 0.2 app "Invalid" package "dev.aic.invalid" {
+  resources {
+    color primary = "#112233"
+    theme app primary primary accent missing
+  }
+  activity MainActivity { on_create {
+    let text = android.text_view(text: "Invalid")
+    android.set_content_view(text)
+  } }
+}

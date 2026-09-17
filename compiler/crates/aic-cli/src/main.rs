@@ -1,4 +1,4 @@
-use aic_build::{compile_source, inject_stored_zip};
+use aic_build::{compile_source_with_assets, inject_stored_zip, ProjectAsset};
 use aic_dex::encode_minimal_dex;
 use aic_ir::{migrate_source, MinimalClass};
 use aic_opt::{CompilerOptions, OptimizationLevel};
@@ -27,7 +27,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("compile") => compile(&args[1..]),
         Some("migrate") => migrate(&args[1..]),
         Some("assemble-apk") => assemble(&args[1..]),
-        _ => Err("usage: aic-cli emit-minimal | compile --input <file> --output-dir <dir> --profile android-35 [--opt-level 0|1] | migrate --input <file> --output <file> --to 0.2 | assemble-apk --base <apk> --dex <dex> --output <apk>".into()),
+        _ => Err("usage: aic-cli emit-minimal | compile --input <file> --output-dir <dir> --profile android-35 [--opt-level 0|1] [--assets-dir <dir>] | migrate --input <file> --output <file> --to 0.2 | assemble-apk --base <apk> --dex <dex> --output <apk>".into()),
     }
 }
 fn migrate(args: &[OsString]) -> Result<(), Box<dyn Error>> {
@@ -64,15 +64,26 @@ fn compile(args: &[OsString]) -> Result<(), Box<dyn Error>> {
         Some("1") => OptimizationLevel::Basic,
         _ => return Err("unsupported optimization level; expected 0 or 1".into()),
     };
-    let artifacts = compile_source(
+    let assets = optional(args, "--assets-dir")
+        .map(|directory| read_assets(&directory))
+        .transpose()?
+        .unwrap_or_default();
+    let artifacts = compile_source_with_assets(
         &fs::read_to_string(input)?,
         CompilerOptions { optimization_level },
+        &assets,
     )?;
     fs::create_dir_all(&output)?;
     write_file(
         &output.join("AndroidManifest.axml"),
         &artifacts.binary_manifest,
     )?;
+    if !artifacts.resources_arsc.is_empty() {
+        write_file(&output.join("resources.arsc"), &artifacts.resources_arsc)?;
+    }
+    for (name, bytes) in &artifacts.resource_entries {
+        write_file(&output.join(name), bytes)?;
+    }
     write_file(&output.join("unsigned.apk"), &artifacts.unsigned_apk)?;
     write_file(&output.join("classes.dex"), &artifacts.dex)?;
     for (name, bytes) in &artifacts.dex_files {
@@ -88,6 +99,26 @@ fn compile(args: &[OsString]) -> Result<(), Box<dyn Error>> {
     )?;
     println!("compiled {}", output.display());
     Ok(())
+}
+fn read_assets(directory: &Path) -> Result<Vec<ProjectAsset>, Box<dyn Error>> {
+    let mut entries = fs::read_dir(directory)?.collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by_key(std::fs::DirEntry::file_name);
+    entries
+        .into_iter()
+        .map(|entry| {
+            if !entry.file_type()?.is_file() {
+                return Err("assets directory may contain files only".into());
+            }
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| "asset filename must be UTF-8")?;
+            Ok(ProjectAsset {
+                name,
+                bytes: fs::read(entry.path())?,
+            })
+        })
+        .collect()
 }
 fn assemble(args: &[OsString]) -> Result<(), Box<dyn Error>> {
     let base = fs::read(option(args, "--base")?)?;

@@ -178,7 +178,7 @@ class MainActivity : Activity() {
     private fun runAi(operation: AiOperation) {
         val prompt=aiPrompt.text.toString().trim(); val current=if(operation==AiOperation.PATCH) data()?.source else null
         if(operation==AiOperation.PATCH) check(project!=null) { "Open a project before requesting an edit" }
-        ai.start(project?.id,operation,prompt,current,if(level.isChecked) 1 else 0)
+        ai.start(project?.id,operation,prompt,current,if(level.isChecked) 1 else 0,data()?.images.orEmpty())
         aiPrompt.setText(""); refresh()
     }
     private fun showAiHistory() {

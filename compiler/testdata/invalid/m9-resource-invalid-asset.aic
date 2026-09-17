@@ -1,0 +1,8 @@
+aic_version 0.2 app "Invalid" package "dev.aic.invalid" {
+  resources { image logo project_asset "../logo.png" }
+  activity MainActivity { on_create {
+    let image = android.image_view(resource: resource.image(logo))
+    android.set_decorative(view: image)
+    android.set_content_view(image)
+  } }
+}

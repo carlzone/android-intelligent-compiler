@@ -7,3 +7,5 @@ $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if ($LASTEXITCODE -ne 0) { throw 'M9 workspace tests failed.' }
 & cargo clippy --manifest-path (Join-Path $root 'compiler/Cargo.toml') --workspace --all-targets --locked -- -D warnings
 if ($LASTEXITCODE -ne 0) { throw 'M9 clippy failed.' }
+& python (Join-Path $root 'compiler/scripts/verify-m9-resources.py') --sdk-root $SdkRoot
+if ($LASTEXITCODE -ne 0) { throw 'M9.4 AAPT2 resource oracle failed.' }

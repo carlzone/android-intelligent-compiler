@@ -1,0 +1,191 @@
+﻿Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        6cbfaa1 dev.aic.m94device/.MainActivity filter 4bcf4c6
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Domain verification status:
+
+Key Set Manager:
+  [dev.aic.m94device]
+      Signing KeySets: 278
+
+Packages:
+  Package [dev.aic.m94device] (b4dbbc2):
+    appId=10536
+    pkg=Package{e211ed5 dev.aic.m94device}
+    codePath=/data/app/~~CA24EwXsbR_VMkdQFFwYjQ==/dev.aic.m94device-Z5BVhxHs73-10e71q27tNQ==
+    resourcePath=/data/app/~~CA24EwXsbR_VMkdQFFwYjQ==/dev.aic.m94device-Z5BVhxHs73-10e71q27tNQ==
+    legacyNativeLibraryDir=/data/app/~~CA24EwXsbR_VMkdQFFwYjQ==/dev.aic.m94device-Z5BVhxHs73-10e71q27tNQ==/lib
+    extractNativeLibs=true
+    primaryCpuAbi=null
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=0 minSdk=23 targetSdk=35
+    minExtensionVersions=[]
+    versionName=null
+    hiddenApiEnforcementPolicy=2
+    usesNonSdkApi=false
+    isMiuiPreinstall=false
+    splits=[base]
+    apkSigningVersion=2
+    flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    pageSizeCompat=0
+    scannedAsStoppedSystemApp=false
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    timeStamp=2026-09-15 22:57:51
+    lastUpdateTime=2026-09-15 22:57:52
+    installerPackageName=null
+    installerPackageUid=-1
+    initiatingPackageName=com.android.shell
+    originatingPackageName=null
+    packageSource=1
+    appMetadataFilePath=null
+    appMetadataSource=0
+    signatures=PackageSignatures{93d36ea version:2, signatures:[711b0097], past signatures:[]}
+    installPermissionsFixed=false
+    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    privatePkgFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    apexModuleName=null
+    User 0: ceDataInode=335337 deDataInode=284019 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false quarantined=false
+      installReason=0
+      dataDir=/data/user/0/dev.aic.m94device
+      firstInstallTime=2026-09-15 22:43:10
+      uninstallReason=0
+      overlay paths:
+        /product/overlay/GestureLineOverlay.apk
+        /data/resource-cache/com.android.systemui-neutral-0WXm.frro
+        /data/resource-cache/com.android.systemui-accent-Bm4X.frro
+        /data/resource-cache/com.android.systemui-dynamic-uwa3.frro
+      legacy overlay paths:
+        /product/overlay/GestureLineOverlay.apk
+      runtime permissions:
+
+Queries:
+  system apps queryable: false
+  queries via forceQueryable:
+  queries via package name:
+  queries via component:
+    [com.xiaomi.misettings,com.android.location.fused,com.miui.qr,com.xiaomi.touchservice,com.miui.bugreport,com.miui.face,com.miui.securitycore,com.android.settings,com.android.server.telecom,com.miui.aod,com.bsp.catchlog,miui.systemui.plugin,com.miui.notification,com.miui.touchassistant,com.android.localtransport,com.android.providers.settings,com.xiaomi.aiasst.vision,vendor.qti.frameworks.utils,com.xiaomi.barrage,com.xiaomi.mirror,com.android.dynsystem,com.qualcomm.qti.services.systemhelper,com.xiaomi.trustservice,com.miui.misightservice,android,com.miui.daemon,com.miui.securitycenter,com.qualcomm.qti.xrvd.service,com.miui.cotaservice,com.android.systemui,com.android.provision,com.miui.powerkeeper,com.android.DeviceAsWebcam,com.miui.cit,com.xiaomi.joyose,com.miui.audiomonitor,com.android.keychain,com.xiaomi.mi_connect_service,com.xiaomi.mtb,com.android.inputdevices]:
+      dev.aic.m94device
+    com.android.thememanager:
+      dev.aic.m94device
+    com.xiaomi.aicr:
+      dev.aic.m94device
+    com.miui.player:
+      dev.aic.m94device
+    com.miui.gallery:
+      dev.aic.m94device
+    com.android.settings.intelligence:
+      dev.aic.m94device
+    com.mi.appfinder:
+      dev.aic.m94device
+    com.miui.euicc:
+      dev.aic.m94device
+    com.mi.globalbrowser:
+      dev.aic.m94device
+    com.mi.globalminusscreen:
+      dev.aic.m94device
+    com.miui.videoplayer:
+      dev.aic.m94device
+    com.google.android.as.oss:
+      dev.aic.m94device
+    com.xiaomi.calendar:
+      dev.aic.m94device
+    com.miui.global.packageinstaller:
+      dev.aic.m94device
+    com.miui.msa.global:
+      dev.aic.m94device
+    com.xiaomi.account:
+      dev.aic.m94device
+    com.xiaomi.simactivate.service:
+      dev.aic.m94device
+    com.netmarble.monster2:
+      dev.aic.m94device
+    com.xiaomi.glgm:
+      dev.aic.m94device
+    com.xiaomi.payment:
+      dev.aic.m94device
+    com.xiaomi.mipicks:
+      dev.aic.m94device
+    com.miui.weather2:
+      dev.aic.m94device
+    com.xiaomi.midrop:
+      dev.aic.m94device
+    com.miui.android.fashiongallery:
+      dev.aic.m94device
+    com.mi.global.shop:
+      dev.aic.m94device
+    com.miui.notes:
+      dev.aic.m94device
+    com.mi.global.bbs:
+      dev.aic.m94device
+    com.duokan.phone.remotecontroller:
+      dev.aic.m94device
+    com.android.soundrecorder:
+      dev.aic.m94device
+    com.xiaomi.smarthome:
+      dev.aic.m94device
+    com.globe.gcash.android:
+      dev.aic.m94device
+    com.amazon.mShop.android.shopping:
+      dev.aic.m94device
+    com.facebook.katana:
+      dev.aic.m94device
+    com.percent.aos.rollinghero:
+      dev.aic.m94device
+    com.agoda.mobile.consumer:
+      dev.aic.m94device
+    com.okinc.okex.gp:
+      dev.aic.m94device
+    com.exness.android.pa:
+      dev.aic.m94device
+    com.instagram.android:
+      dev.aic.m94device
+    ph.billeasev2.mobile:
+      dev.aic.m94device
+    com.ggv.roworldsea.aos:
+      dev.aic.m94device
+    com.whatsapp:
+      dev.aic.m94device
+    com.facebook.orca:
+      dev.aic.m94device
+    com.freereels.app:
+      dev.aic.m94device
+    com.stoneage.privatesub:
+      dev.aic.m94device
+    com.aub.hellopagibig:
+      dev.aic.m94device
+    atws.app:
+      dev.aic.m94device
+    com.albiononline:
+      dev.aic.m94device
+    jp.konami.masterduel:
+      dev.aic.m94device
+    com.gof.global:
+      dev.aic.m94device
+    zombie.survival.craft.z:
+      dev.aic.m94device
+    com.netmarble.rfnext:
+      dev.aic.m94device
+  queryable via interaction:
+    User 0:
+      [com.xiaomi.misettings,com.android.location.fused,com.miui.qr,com.xiaomi.touchservice,com.miui.bugreport,com.miui.face,com.miui.securitycore,com.android.settings,com.android.server.telecom,com.miui.aod,com.bsp.catchlog,miui.systemui.plugin,com.miui.notification,com.miui.touchassistant,com.android.localtransport,com.android.providers.settings,com.xiaomi.aiasst.vision,vendor.qti.frameworks.utils,com.xiaomi.barrage,com.xiaomi.mirror,com.android.dynsystem,com.qualcomm.qti.services.systemhelper,com.xiaomi.trustservice,com.miui.misightservice,android,com.miui.daemon,com.miui.securitycenter,com.qualcomm.qti.xrvd.service,com.miui.cotaservice,com.android.systemui,com.android.provision,com.miui.powerkeeper,com.android.DeviceAsWebcam,com.miui.cit,com.xiaomi.joyose,com.miui.audiomonitor,com.android.keychain,com.xiaomi.mi_connect_service,com.xiaomi.mtb,com.android.inputdevices]:
+        dev.aic.m94device
+      com.google.android.inputmethod.latin:
+        dev.aic.m94device
+  queryable via uses-library:
+
+Dexopt state:
+  [dev.aic.m94device]
+    path: /data/app/~~CA24EwXsbR_VMkdQFFwYjQ==/dev.aic.m94device-Z5BVhxHs73-10e71q27tNQ==/base.apk
+      arm64: [status=verify] [reason=install] [primary-abi]
+        [location is /data/app/~~CA24EwXsbR_VMkdQFFwYjQ==/dev.aic.m94device-Z5BVhxHs73-10e71q27tNQ==/oat/arm64/base.odex]
+    base APK odex file size: base.odex: 16Kb base.vdex: 0Kb 
+
+Compiler stats:
+  [dev.aic.m94device]
+     base.apk - 101

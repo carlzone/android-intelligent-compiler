@@ -1,0 +1,24 @@
+aic_version 0.2 app "M9.4 Resources" package "dev.aic.m94device" {
+  resources {
+    string greeting = "Hello from M9.4"
+    string greeting locale "zh-TW" = "M9.4 資源測試"
+    color primary = "#1565C0"
+    color accent = "#FF8F00"
+    image launcher project_asset "launcher.png"
+    theme app primary primary accent accent
+    launcher_icon launcher
+  }
+
+  activity MainActivity {
+    on_create {
+      let root = android.linear_layout(orientation: vertical)
+      let greeting = android.text_view(text: resource.string(greeting))
+      android.set_text_color(view: greeting, color: resource.color(primary))
+      let image = android.image_view(resource: resource.image(launcher))
+      android.set_content_description(view: image, text: resource.string(greeting))
+      android.add_view(parent: root, child: greeting)
+      android.add_view(parent: root, child: image)
+      android.set_content_view(root)
+    }
+  }
+}

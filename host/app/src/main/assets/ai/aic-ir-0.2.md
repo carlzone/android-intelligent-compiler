@@ -1,8 +1,20 @@
 # AIC IR 0.2 model contract
 
+Adaptive activities declare `capability ui.adaptive` and exactly four mutually
+exclusive bodies: `on_create for portrait compact`, `portrait expanded`,
+`landscape compact`, and `landscape expanded`. Compact means a current window
+width below 600dp; expanded means 600dp or wider. Every variant must declare
+the same view identifiers, kinds, and order so event and lifecycle bindings are
+stable. Declare `capability lifecycle.state_restoration` when Activity scalar
+state must survive recreation and process death. Generated code also assigns
+stable recreation-order view IDs so Android restores supported widget state;
+password input saving is explicitly disabled.
+
 Interactive controls receive an automatic 48dp minimum width and height. A fixed `android.set_layout` width or height below 48 is invalid for buttons, editable inputs, checkboxes, switches, spinners, lists, and toolbars; `wrap_content` and `match_parent` remain valid.
 
 Every `android.image_view` must have exactly one accessibility treatment: a non-empty `android.set_content_description(view: ..., text: ...)` for informative images, or `android.set_decorative(view: ...)` for images that should be omitted from accessibility navigation. Progress controls require a non-empty content description. `android.set_enabled` accepts only interactive controls; `android.set_visibility` accepts every view. Do not emit conflicting constant enabled or visibility assignments in one block.
+
+Bounded resources are declared first in `resources { ... }`. Strings use `string name = "default"` plus optional canonical locale variants and are referenced with `resource.string(name)`. Colors use `color name = "#RRGGBB"` or `#AARRGGBB` and `resource.color(name)`. Project images use `image name project_asset "name.png"` (PNG/WebP) and `android.image_view(resource: resource.image(name))`. At most one `theme app primary color_name accent color_name` and one `launcher_icon image_name` may be declared. Do not invent paths, qualifiers, XML resources, vectors, density variants, or undeclared assets.
 
 Fixed collections use `state items: string[] = ["One", "Two"]` with 1–100 string literals. `android.list_view(items: items)` and `android.spinner(items: items)` accept collection state or an inline list. Handle either widget with `on_select(view, index, value)`; `index` is an immutable zero-based `i32`, `value` is an immutable `string`, and Spinner setup does not invoke the handler.
 

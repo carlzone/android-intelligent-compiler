@@ -1,11 +1,26 @@
 (* AIC IR 0.2. The Rust parser, verifier, and capability catalog are authoritative. *)
-program       = "aic_version", "0.2", "app", string, "package", string, "{", { app-member }, activity, { activity }, "}" ;
+program       = "aic_version", "0.2", "app", string, "package", string, "{", [ resources ], { app-member }, activity, { activity }, "}" ;
+resources     = "resources", "{", { string-resource | color-resource | image-resource | theme-resource | launcher-icon }, "}" ;
+string-resource = "string", identifier, [ "locale", string ], "=", string ;
+color-resource = "color", identifier, "=", color-literal ;
+image-resource = "image", identifier, "project_asset", string ;
+theme-resource = "theme", "app", "primary", identifier, "accent", identifier ;
+launcher-icon = "launcher_icon", identifier ;
+(* Names are lower_snake_case. Every localized key has exactly one non-empty
+   default and at most one value per canonical BCP-47 locale. *)
+(* Typed runtime references are resource.string(name), resource.color(name),
+   and android.image_view(resource: resource.image(name)). *)
 app-member    = capability | preference | database | function ;
-activity      = "activity", identifier, "{", { state | string-collection }, on-create, { on-click }, { on-select }, "}" ;
+activity      = "activity", identifier, "{", { state | string-collection },
+                ( on-create | adaptive-on-create, adaptive-on-create, adaptive-on-create, adaptive-on-create ),
+                { on-click }, { on-select }, "}" ;
 state         = "state", identifier, ":", type, "=", literal ;
 string-collection = "state", identifier, ":", "string", "[", "]", "=", "[", string,
                     { ",", string }, "]" ; (* 1..100 fixed items *)
 on-create     = "on_create", block ;
+adaptive-on-create = "on_create", "for", device-orientation, window-class, block ;
+device-orientation = "portrait" | "landscape" ;
+window-class  = "compact" | "expanded" ; (* compact < 600dp; expanded >= 600dp *)
 on-click      = "on_click", "(", identifier, ")", block ;
 on-select     = "on_select", "(", identifier, ",", identifier, ",", identifier, ")", block ;
 navigation    = "android.start_activity", "(", identifier, [ ",", "extras", ":", named-values ], ")" | "android.finish", "(", ")" ;
@@ -70,6 +85,9 @@ layout        = "android.set_layout", "(", "view", ":", identifier, ",", "width"
                 [ ",", "margin_left", ":", bounded-dp, ",", "margin_top", ":", bounded-dp,
                   ",", "margin_right", ":", bounded-dp, ",", "margin_bottom", ":", bounded-dp ], ")" ;
 type          = "i32" | "bool" | "string" ;
+capability    = "capability", ( "persistence", ".", ( "key_value" | "sqlite" ) |
+                               "ui", ".", "adaptive" |
+                               "lifecycle", ".", "state_restoration" ) ;
 
 (* IR 0.1 declarations and expressions remain source-compatible. The complete
    closed vocabulary is published by capabilities-0.2.json and parser tests. *)

@@ -139,6 +139,14 @@ pub enum ExpressionKind {
     AndroidText {
         view: String,
     },
+    ResourceString {
+        name: String,
+        id: u32,
+    },
+    ResourceColor {
+        name: String,
+        id: u32,
+    },
     PreferenceGet {
         key: String,
     },
@@ -247,7 +255,7 @@ pub enum StatementKind {
     },
     ImageView {
         id: String,
-        icon: BuiltinIcon,
+        source: ImageSource,
     },
     Toolbar {
         id: String,
@@ -290,6 +298,16 @@ pub enum StatementKind {
     SetBackgroundColor {
         view: String,
         color: String,
+    },
+    SetTextResourceColor {
+        view: String,
+        name: String,
+        id: u32,
+    },
+    SetBackgroundResourceColor {
+        view: String,
+        name: String,
+        id: u32,
     },
     StartActivity {
         activity: String,
@@ -356,6 +374,8 @@ pub enum StatementKind {
 pub enum Capability {
     KeyValue,
     Sqlite,
+    Adaptive,
+    StateRestoration,
 }
 impl Capability {
     #[must_use]
@@ -363,6 +383,8 @@ impl Capability {
         match self {
             Self::KeyValue => "persistence.key_value",
             Self::Sqlite => "persistence.sqlite",
+            Self::Adaptive => "ui.adaptive",
+            Self::StateRestoration => "lifecycle.state_restoration",
         }
     }
 }
@@ -399,6 +421,23 @@ pub enum Orientation {
     Vertical,
     Horizontal,
 }
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum DeviceOrientation {
+    Portrait,
+    Landscape,
+}
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum WindowClass {
+    Compact,
+    Expanded,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CreateVariant {
+    pub orientation: DeviceOrientation,
+    pub window: WindowClass,
+    pub body: Vec<Statement>,
+    pub span: SourceSpan,
+}
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LayoutSize {
     MatchParent,
@@ -422,6 +461,12 @@ pub enum BuiltinIcon {
     Info,
     Warning,
     Delete,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ImageSource {
+    Builtin(BuiltinIcon),
+    Resource { name: String, id: u32 },
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InputType {
@@ -483,6 +528,7 @@ pub struct SyntaxActivity {
     pub state: Vec<State>,
     pub string_collections: Vec<StringCollectionState>,
     pub on_create: Vec<Statement>,
+    pub on_create_variants: Vec<CreateVariant>,
     pub on_click: Vec<ClickHandler>,
     pub on_select: Vec<SelectHandler>,
 }
@@ -491,6 +537,11 @@ pub struct SyntaxProgram {
     pub version: String,
     pub label: String,
     pub package: String,
+    pub string_resources: Vec<StringResource>,
+    pub color_resources: Vec<ColorResource>,
+    pub image_resources: Vec<ImageResource>,
+    pub app_theme: Option<AppTheme>,
+    pub launcher_icon: Option<ResourceReference>,
     pub capabilities: Vec<(Capability, SourceSpan)>,
     pub preferences: Vec<Preference>,
     pub database: Option<Database>,
@@ -512,6 +563,7 @@ pub struct Activity {
     pub state: Vec<State>,
     pub string_collections: Vec<StringCollectionState>,
     pub on_create: Vec<Statement>,
+    pub on_create_variants: Vec<CreateVariant>,
     pub on_click: Vec<ClickHandler>,
     pub on_select: Vec<SelectHandler>,
 }
@@ -520,12 +572,54 @@ pub struct Program {
     pub version: String,
     pub label: String,
     pub package: String,
+    pub string_resources: Vec<StringResource>,
+    pub color_resources: Vec<ColorResource>,
+    pub image_resources: Vec<ImageResource>,
+    pub app_theme: Option<AppTheme>,
+    pub launcher_icon: Option<ResourceReference>,
     pub capabilities: BTreeSet<Capability>,
     pub preferences: Vec<Preference>,
     pub database: Option<Database>,
     pub functions: Vec<Function>,
     pub activity: Activity,
     pub activities: Vec<Activity>,
+}
+
+/// A canonical application string. `locale == None` is the required default.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StringResource {
+    pub name: String,
+    pub locale: Option<String>,
+    pub value: String,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ColorResource {
+    pub name: String,
+    pub value: String,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImageResource {
+    pub name: String,
+    pub project_asset: String,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResourceReference {
+    pub name: String,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AppTheme {
+    pub name: String,
+    pub primary: ResourceReference,
+    pub accent: ResourceReference,
+    pub span: SourceSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -748,6 +842,9 @@ fn lex(src: &str) -> Result<Vec<Tok>, Diagnostic> {
 struct Parser {
     t: Vec<Tok>,
     i: usize,
+    string_resource_ids: BTreeMap<String, u32>,
+    color_resource_ids: BTreeMap<String, u32>,
+    image_resource_ids: BTreeMap<String, u32>,
 }
 impl Parser {
     fn cur(&self) -> &Tok {
@@ -819,27 +916,193 @@ impl Parser {
         self.word("package")?;
         let package = self.string()?;
         self.sym("{")?;
+        let mut string_resources = vec![];
+        let mut color_resources = vec![];
+        let mut image_resources = vec![];
+        let mut app_theme = None;
+        let mut launcher_icon = None;
+        if matches!(&self.cur().k,K::Word(v)if v=="resources") {
+            self.pop();
+            self.sym("{")?;
+            while self.cur().k != K::Sym("}") {
+                let token = self.pop();
+                let K::Word(kind) = token.k else {
+                    return Err(Diagnostic::at(
+                        "AIC1449",
+                        token.s,
+                        "expected resource declaration",
+                    ));
+                };
+                let start = token.s.start;
+                match kind.as_str() {
+                    "string" => {
+                        let (name, _) = self.id()?;
+                        let locale = if matches!(&self.cur().k,K::Word(v)if v=="locale") {
+                            self.pop();
+                            Some(self.string()?)
+                        } else {
+                            None
+                        };
+                        self.sym("=")?;
+                        let value = self.string()?;
+                        string_resources.push(StringResource {
+                            name,
+                            locale,
+                            value,
+                            span: SourceSpan {
+                                start,
+                                end: self.t[self.i - 1].s.end,
+                            },
+                        });
+                    }
+                    "color" => {
+                        let (name, _) = self.id()?;
+                        self.sym("=")?;
+                        let value = self.string()?;
+                        color_resources.push(ColorResource {
+                            name,
+                            value,
+                            span: SourceSpan {
+                                start,
+                                end: self.t[self.i - 1].s.end,
+                            },
+                        });
+                    }
+                    "image" => {
+                        let (name, _) = self.id()?;
+                        self.word("project_asset")?;
+                        let project_asset = self.string()?;
+                        image_resources.push(ImageResource {
+                            name,
+                            project_asset,
+                            span: SourceSpan {
+                                start,
+                                end: self.t[self.i - 1].s.end,
+                            },
+                        });
+                    }
+                    "theme" => {
+                        if app_theme.is_some() {
+                            return Err(Diagnostic::at(
+                                "AIC1450",
+                                token.s,
+                                "only one application theme is supported",
+                            ));
+                        }
+                        self.word("app")?;
+                        let name = "app".to_owned();
+                        self.word("primary")?;
+                        let (primary, primary_span) = self.id()?;
+                        self.word("accent")?;
+                        let (accent, accent_span) = self.id()?;
+                        app_theme = Some(AppTheme {
+                            name,
+                            primary: ResourceReference {
+                                name: primary,
+                                span: primary_span,
+                            },
+                            accent: ResourceReference {
+                                name: accent,
+                                span: accent_span,
+                            },
+                            span: SourceSpan {
+                                start,
+                                end: self.t[self.i - 1].s.end,
+                            },
+                        });
+                    }
+                    "launcher_icon" => {
+                        if launcher_icon.is_some() {
+                            return Err(Diagnostic::at(
+                                "AIC1451",
+                                token.s,
+                                "only one launcher icon is supported",
+                            ));
+                        }
+                        let (name, span) = self.id()?;
+                        launcher_icon = Some(ResourceReference { name, span });
+                    }
+                    _ => {
+                        return Err(Diagnostic::at(
+                            "AIC1449",
+                            token.s,
+                            "unsupported resource declaration",
+                        ))
+                    }
+                }
+            }
+            self.sym("}")?;
+            for (index, name) in string_resources
+                .iter()
+                .filter(|resource| resource.locale.is_none())
+                .map(|resource| resource.name.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .enumerate()
+            {
+                let index = u32::try_from(index)
+                    .map_err(|_| Diagnostic::global("AIC1464", "too many string resources"))?;
+                self.string_resource_ids.insert(name, 0x7f01_0000 | index);
+            }
+            for (index, name) in color_resources
+                .iter()
+                .map(|resource| resource.name.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .enumerate()
+            {
+                let index = u32::try_from(index)
+                    .map_err(|_| Diagnostic::global("AIC1464", "too many color resources"))?;
+                self.color_resource_ids.insert(name, 0x7f02_0000 | index);
+            }
+            let launcher_name = launcher_icon.as_ref().map(|icon| icon.name.as_str());
+            let mut drawable_index = 0_u32;
+            for name in image_resources
+                .iter()
+                .map(|resource| resource.name.clone())
+                .collect::<BTreeSet<_>>()
+            {
+                if launcher_name == Some(name.as_str()) {
+                    self.image_resource_ids.insert(name, 0x7f04_0000);
+                } else {
+                    self.image_resource_ids
+                        .insert(name, 0x7f03_0000 | drawable_index);
+                    drawable_index += 1;
+                }
+            }
+        }
         let mut capabilities = vec![];
         while matches!(&self.cur().k,K::Word(v)if v=="capability") {
             let start = self.pop().s.start;
-            self.word("persistence")?;
+            let domain = self.pop();
+            let K::Word(domain_name) = &domain.k else {
+                return Err(Diagnostic::at(
+                    "AIC1301",
+                    domain.s,
+                    "expected capability domain",
+                ));
+            };
             self.sym(".")?;
             let token = self.pop();
-            let capability = match &token.k {
-                K::Word(v) if v == "key_value" => Capability::KeyValue,
-                K::Word(v) if v == "sqlite" => Capability::Sqlite,
-                K::Word(v) => {
+            let capability = match (domain_name.as_str(), &token.k) {
+                ("persistence", K::Word(v)) if v == "key_value" => Capability::KeyValue,
+                ("persistence", K::Word(v)) if v == "sqlite" => Capability::Sqlite,
+                ("ui", K::Word(v)) if v == "adaptive" => Capability::Adaptive,
+                ("lifecycle", K::Word(v)) if v == "state_restoration" => {
+                    Capability::StateRestoration
+                }
+                (_, K::Word(v)) => {
                     return Err(Diagnostic::at(
                         "AIC1301",
                         token.s,
-                        format!("unsupported capability `persistence.{v}`"),
+                        format!("unsupported capability `{domain_name}.{v}`"),
                     ))
                 }
-                _ => {
+                (_, _) => {
                     return Err(Diagnostic::at(
                         "AIC1301",
                         token.s,
-                        "expected persistence capability",
+                        "expected capability name",
                     ))
                 }
             };
@@ -903,6 +1166,11 @@ impl Parser {
             version: format!("0.{minor}"),
             label,
             package,
+            string_resources,
+            color_resources,
+            image_resources,
+            app_theme,
+            launcher_icon,
             capabilities,
             preferences,
             database,
@@ -957,8 +1225,64 @@ impl Parser {
                 });
             }
         }
-        self.word("on_create")?;
-        let on_create = self.block()?;
+        let mut on_create = vec![];
+        let mut on_create_variants = vec![];
+        while matches!(&self.cur().k,K::Word(v)if v=="on_create") {
+            let start = self.pop().s.start;
+            if matches!(&self.cur().k,K::Word(v)if v=="for") {
+                self.pop();
+                let orientation_token = self.pop();
+                let orientation = match &orientation_token.k {
+                    K::Word(v) if v == "portrait" => DeviceOrientation::Portrait,
+                    K::Word(v) if v == "landscape" => DeviceOrientation::Landscape,
+                    _ => {
+                        return Err(Diagnostic::at(
+                            "AIC1465",
+                            orientation_token.s,
+                            "adaptive orientation must be portrait or landscape",
+                        ))
+                    }
+                };
+                let window_token = self.pop();
+                let window = match &window_token.k {
+                    K::Word(v) if v == "compact" => WindowClass::Compact,
+                    K::Word(v) if v == "expanded" => WindowClass::Expanded,
+                    _ => {
+                        return Err(Diagnostic::at(
+                            "AIC1466",
+                            window_token.s,
+                            "adaptive window class must be compact or expanded",
+                        ))
+                    }
+                };
+                let body = self.block()?;
+                on_create_variants.push(CreateVariant {
+                    orientation,
+                    window,
+                    body,
+                    span: SourceSpan {
+                        start,
+                        end: self.t[self.i - 1].s.end,
+                    },
+                });
+            } else {
+                if !on_create.is_empty() {
+                    return Err(Diagnostic::at(
+                        "AIC1467",
+                        self.cur().s,
+                        "activity may contain only one legacy on_create body",
+                    ));
+                }
+                on_create = self.block()?;
+            }
+        }
+        if on_create.is_empty() && on_create_variants.is_empty() {
+            return Err(Diagnostic::at(
+                "AIC1001",
+                self.cur().s,
+                "expected on_create",
+            ));
+        }
         let mut on_click = vec![];
         while matches!(&self.cur().k,K::Word(v)if v=="on_click") {
             let start = self.pop().s.start;
@@ -1003,6 +1327,7 @@ impl Parser {
             state,
             string_collections,
             on_create,
+            on_create_variants,
             on_click,
             on_select,
         })
@@ -1232,22 +1557,40 @@ impl Parser {
                             }
                             "progress_bar" => StatementKind::ProgressBar { id: name },
                             "image_view" => {
-                                self.word("icon")?;
+                                let (argument, argument_span) = self.id()?;
                                 self.sym(":")?;
-                                let (value, span) = self.id()?;
-                                let icon = match value.as_str() {
-                                    "info" => BuiltinIcon::Info,
-                                    "warning" => BuiltinIcon::Warning,
-                                    "delete" => BuiltinIcon::Delete,
-                                    _ => {
-                                        return Err(Diagnostic::at(
-                                            "AIC1413",
-                                            span,
-                                            "icon must be info, warning, or delete",
-                                        ))
-                                    }
+                                let source = if argument == "icon" {
+                                    let (value, span) = self.id()?;
+                                    ImageSource::Builtin(match value.as_str() {
+                                        "info" => BuiltinIcon::Info,
+                                        "warning" => BuiltinIcon::Warning,
+                                        "delete" => BuiltinIcon::Delete,
+                                        _ => {
+                                            return Err(Diagnostic::at(
+                                                "AIC1413",
+                                                span,
+                                                "icon must be info, warning, or delete",
+                                            ))
+                                        }
+                                    })
+                                } else if argument == "resource" {
+                                    self.word("resource")?;
+                                    self.sym(".")?;
+                                    self.word("image")?;
+                                    self.sym("(")?;
+                                    let (name, _) = self.id()?;
+                                    self.sym(")")?;
+                                    let id =
+                                        self.image_resource_ids.get(&name).copied().unwrap_or(0);
+                                    ImageSource::Resource { name, id }
+                                } else {
+                                    return Err(Diagnostic::at(
+                                        "AIC1459",
+                                        argument_span,
+                                        "image_view expects `icon` or `resource`",
+                                    ));
                                 };
-                                StatementKind::ImageView { id: name, icon }
+                                StatementKind::ImageView { id: name, source }
                             }
                             "toolbar" => {
                                 self.word("title")?;
@@ -1555,18 +1898,33 @@ impl Parser {
                 self.sym(",")?;
                 self.word("color")?;
                 self.sym(":")?;
-                let color = self.string()?;
-                if !valid_color(&color) {
-                    return Err(Diagnostic::at(
-                        "AIC1014",
-                        self.t[self.i - 1].s,
-                        "color must be #RRGGBB or #AARRGGBB",
-                    ));
-                }
-                if n == "set_text_color" {
-                    StatementKind::SetTextColor { view, color }
+                if matches!(self.cur().k, K::Str(_)) {
+                    let color = self.string()?;
+                    if !valid_color(&color) {
+                        return Err(Diagnostic::at(
+                            "AIC1014",
+                            self.t[self.i - 1].s,
+                            "color must be #RRGGBB or #AARRGGBB",
+                        ));
+                    }
+                    if n == "set_text_color" {
+                        StatementKind::SetTextColor { view, color }
+                    } else {
+                        StatementKind::SetBackgroundColor { view, color }
+                    }
                 } else {
-                    StatementKind::SetBackgroundColor { view, color }
+                    self.word("resource")?;
+                    self.sym(".")?;
+                    self.word("color")?;
+                    self.sym("(")?;
+                    let (name, _) = self.id()?;
+                    self.sym(")")?;
+                    let id = self.color_resource_ids.get(&name).copied().unwrap_or(0);
+                    if n == "set_text_color" {
+                        StatementKind::SetTextResourceColor { view, name, id }
+                    } else {
+                        StatementKind::SetBackgroundResourceColor { view, name, id }
+                    }
                 }
             }
             "start_activity" => {
@@ -1815,6 +2173,38 @@ impl Parser {
                     },
                 })
             }
+            K::Word(n) if n == "resource" && self.cur().k == K::Sym(".") => {
+                self.pop();
+                let token = self.pop();
+                let K::Word(kind) = token.k else {
+                    return Err(Diagnostic::at("AIC1460", token.s, "expected resource kind"));
+                };
+                let span = token.s;
+                self.sym("(")?;
+                let (name, _) = self.id()?;
+                let end = self.sym(")")?.s.end;
+                let kind = match kind.as_str() {
+                    "string" => ExpressionKind::ResourceString {
+                        id: self.string_resource_ids.get(&name).copied().unwrap_or(0),
+                        name,
+                    },
+                    "color" => ExpressionKind::ResourceColor {
+                        id: self.color_resource_ids.get(&name).copied().unwrap_or(0),
+                        name,
+                    },
+                    _ => {
+                        return Err(Diagnostic::at(
+                            "AIC1460",
+                            span,
+                            "resource expression must be string or color",
+                        ))
+                    }
+                };
+                Ok(Expression {
+                    kind,
+                    span: SourceSpan { start: st, end },
+                })
+            }
             K::Word(n) if (n == "preference" || n == "database") && self.cur().k == K::Sym(".") => {
                 self.pop();
                 let (operation, span) = self.id()?;
@@ -1935,9 +2325,15 @@ fn keyword(v: &str) -> bool {
         "aic_version"
             | "app"
             | "package"
+            | "resources"
+            | "locale"
             | "fn"
             | "activity"
             | "on_create"
+            | "portrait"
+            | "landscape"
+            | "compact"
+            | "expanded"
             | "on_click"
             | "state"
             | "capability"
@@ -1982,6 +2378,9 @@ pub fn parse(source: &str) -> Result<SyntaxProgram, Diagnostic> {
     Parser {
         t: lex(source)?,
         i: 0,
+        string_resource_ids: BTreeMap::new(),
+        color_resource_ids: BTreeMap::new(),
+        image_resource_ids: BTreeMap::new(),
     }
     .program()
 }
@@ -2046,8 +2445,18 @@ struct Check {
     used_capabilities: BTreeSet<Capability>,
     string_collections: BTreeSet<String>,
     strict_ui_semantics: bool,
+    string_resources: BTreeSet<String>,
+    color_resources: BTreeSet<String>,
+    image_resources: BTreeSet<String>,
+    allow_resource_runtime: bool,
 }
 pub fn verify(mut s: SyntaxProgram) -> Result<Program, Diagnostic> {
+    s.string_resources
+        .sort_by(|left, right| (&left.name, &left.locale).cmp(&(&right.name, &right.locale)));
+    s.color_resources
+        .sort_by(|left, right| left.name.cmp(&right.name));
+    s.image_resources
+        .sort_by(|left, right| left.name.cmp(&right.name));
     let mut names = BTreeSet::new();
     for activity in &s.activities {
         if !names.insert(activity.name.clone()) {
@@ -2059,6 +2468,9 @@ pub fn verify(mut s: SyntaxProgram) -> Result<Program, Diagnostic> {
     }
     for activity in &mut s.activities {
         validate_navigation(&mut activity.on_create, &names, &s.package)?;
+        for variant in &mut activity.on_create_variants {
+            validate_navigation(&mut variant.body, &names, &s.package)?;
+        }
         for handler in &mut activity.on_click {
             validate_navigation(&mut handler.body, &names, &s.package)?;
         }
@@ -2066,6 +2478,121 @@ pub fn verify(mut s: SyntaxProgram) -> Result<Program, Diagnostic> {
             validate_navigation(&mut handler.body, &names, &s.package)?;
         }
     }
+    let declared: BTreeSet<_> = s.capabilities.iter().map(|entry| entry.0).collect();
+    let has_adaptive = s
+        .activities
+        .iter()
+        .any(|activity| !activity.on_create_variants.is_empty());
+    if has_adaptive && !declared.contains(&Capability::Adaptive) {
+        return Err(Diagnostic::global(
+            "AIC1468",
+            "capability `ui.adaptive` is used but not declared",
+        ));
+    }
+    if declared.contains(&Capability::Adaptive) && !has_adaptive {
+        return Err(Diagnostic::global(
+            "AIC1316",
+            "declared capability `ui.adaptive` is unused",
+        ));
+    }
+    let has_restoration = s
+        .activities
+        .iter()
+        .any(|activity| !activity.state.is_empty() || !activity.string_collections.is_empty());
+    if declared.contains(&Capability::StateRestoration) && !has_restoration {
+        return Err(Diagnostic::global(
+            "AIC1316",
+            "declared capability `lifecycle.state_restoration` is unused",
+        ));
+    }
+    let mut verified_variants = BTreeMap::new();
+    for activity in &s.activities {
+        if activity.on_create_variants.is_empty() {
+            continue;
+        }
+        if s.version != "0.2" || !activity.on_create.is_empty() {
+            return Err(Diagnostic::global("AIC1469", "adaptive activities require IR 0.2 and cannot mix legacy and qualified on_create bodies"));
+        }
+        let expected = [
+            (DeviceOrientation::Portrait, WindowClass::Compact),
+            (DeviceOrientation::Portrait, WindowClass::Expanded),
+            (DeviceOrientation::Landscape, WindowClass::Compact),
+            (DeviceOrientation::Landscape, WindowClass::Expanded),
+        ];
+        let mut seen = BTreeSet::new();
+        for variant in &activity.on_create_variants {
+            if !seen.insert((variant.orientation, variant.window)) {
+                return Err(Diagnostic::at(
+                    "AIC1470",
+                    variant.span,
+                    "duplicate adaptive on_create variant",
+                ));
+            }
+        }
+        if seen != expected.into_iter().collect() {
+            return Err(Diagnostic::global("AIC1471", "adaptive activity requires exactly portrait/landscape crossed with compact/expanded"));
+        }
+        let view_signature = |body: &[Statement]| {
+            body.iter()
+                .filter_map(|statement| {
+                    let (id, kind) = match &statement.kind {
+                        StatementKind::LinearLayout { id, .. } => (id, "linear_layout"),
+                        StatementKind::TextView { id, .. } => (id, "text_view"),
+                        StatementKind::Button { id, .. } => (id, "button"),
+                        StatementKind::EditText { id, .. } => (id, "edit_text"),
+                        StatementKind::TextInput { id, .. } => (id, "text_input"),
+                        StatementKind::ScrollView { id } => (id, "scroll_view"),
+                        StatementKind::FrameLayout { id } => (id, "frame_layout"),
+                        StatementKind::CheckBox { id, .. } => (id, "check_box"),
+                        StatementKind::Switch { id, .. } => (id, "switch"),
+                        StatementKind::ProgressBar { id } => (id, "progress_bar"),
+                        StatementKind::ImageView { id, .. } => (id, "image_view"),
+                        StatementKind::Toolbar { id, .. } => (id, "toolbar"),
+                        StatementKind::ListView { id, .. } => (id, "list_view"),
+                        StatementKind::Spinner { id, .. } => (id, "spinner"),
+                        _ => return None,
+                    };
+                    Some((id.clone(), kind))
+                })
+                .collect::<Vec<_>>()
+        };
+        let signature = view_signature(&activity.on_create_variants[0].body);
+        if activity
+            .on_create_variants
+            .iter()
+            .skip(1)
+            .any(|variant| view_signature(&variant.body) != signature)
+        {
+            return Err(Diagnostic::global(
+                "AIC1472",
+                "adaptive variants must declare the same view identifiers, kinds, and order",
+            ));
+        }
+        let mut bodies = Vec::new();
+        for variant in &activity.on_create_variants {
+            let mut item = s.clone();
+            let mut selected = activity.clone();
+            selected.on_create.clone_from(&variant.body);
+            selected.on_create_variants.clear();
+            item.activity = selected.clone();
+            item.activities = vec![selected];
+            item.capabilities.retain(|entry| {
+                !matches!(entry.0, Capability::Adaptive | Capability::StateRestoration)
+            });
+            bodies.push(CreateVariant {
+                body: verify_one(item, false)?.activity.on_create,
+                ..variant.clone()
+            });
+        }
+        verified_variants.insert(activity.name.clone(), bodies);
+    }
+    for activity in &mut s.activities {
+        if let Some(variants) = verified_variants.get(&activity.name) {
+            activity.on_create = variants[0].body.clone();
+        }
+    }
+    s.capabilities
+        .retain(|entry| !matches!(entry.0, Capability::Adaptive | Capability::StateRestoration));
     s.activity = s.activities[0].clone();
     if s.version == "0.1" && s.activities.len() != 1 {
         return Err(Diagnostic::global(
@@ -2074,7 +2601,20 @@ pub fn verify(mut s: SyntaxProgram) -> Result<Program, Diagnostic> {
         ));
     }
     if s.activities.len() == 1 {
-        return verify_one(s, true);
+        let result = verify_one(s.clone(), true)?;
+        validate_resource_usage(&s)?;
+        let mut result = result;
+        if let Some(variants) = verified_variants.remove(&result.activity.name) {
+            result.activity.on_create_variants.clone_from(&variants);
+            result.activities[0].on_create_variants = variants;
+        }
+        if has_adaptive {
+            result.capabilities.insert(Capability::Adaptive);
+        }
+        if declared.contains(&Capability::StateRestoration) {
+            result.capabilities.insert(Capability::StateRestoration);
+        }
+        return Ok(result);
     }
     let mut verified = Vec::new();
     for activity in &s.activities {
@@ -2083,13 +2623,203 @@ pub fn verify(mut s: SyntaxProgram) -> Result<Program, Diagnostic> {
         item.activities = vec![activity.clone()];
         verified.push(verify_one(item, false)?.activity);
     }
+    validate_resource_usage(&s)?;
     let mut result_source = s;
     result_source.activity = result_source.activities[0].clone();
     result_source.activities = vec![result_source.activity.clone()];
     let mut result = verify_one(result_source, false)?;
     result.activity = verified[0].clone();
     result.activities = verified;
+    for activity in &mut result.activities {
+        if let Some(variants) = verified_variants.remove(&activity.name) {
+            activity.on_create_variants = variants;
+        }
+    }
+    result.activity = result.activities[0].clone();
+    if has_adaptive {
+        result.capabilities.insert(Capability::Adaptive);
+    }
+    if declared.contains(&Capability::StateRestoration) {
+        result.capabilities.insert(Capability::StateRestoration);
+    }
     Ok(result)
+}
+
+fn validate_resource_usage(program: &SyntaxProgram) -> Result<(), Diagnostic> {
+    fn expression(
+        value: &Expression,
+        strings: &mut BTreeSet<String>,
+        colors: &mut BTreeSet<String>,
+    ) {
+        match &value.kind {
+            ExpressionKind::ResourceString { name, .. } => {
+                strings.insert(name.clone());
+            }
+            ExpressionKind::ResourceColor { name, .. } => {
+                colors.insert(name.clone());
+            }
+            ExpressionKind::Unary { value, .. } => expression(value, strings, colors),
+            ExpressionKind::Binary { left, right, .. } => {
+                expression(left, strings, colors);
+                expression(right, strings, colors);
+            }
+            ExpressionKind::Call { args, .. } => {
+                for arg in args {
+                    expression(arg, strings, colors);
+                }
+            }
+            ExpressionKind::DatabaseInsert { values, .. } => {
+                for (_, value) in values {
+                    expression(value, strings, colors);
+                }
+            }
+            ExpressionKind::DatabaseExists { id, .. } => expression(id, strings, colors),
+            ExpressionKind::DatabaseGet { id, default, .. } => {
+                expression(id, strings, colors);
+                expression(default, strings, colors);
+            }
+            _ => {}
+        }
+    }
+    fn statements(
+        body: &[Statement],
+        strings: &mut BTreeSet<String>,
+        colors: &mut BTreeSet<String>,
+        images: &mut BTreeSet<String>,
+    ) {
+        for statement in body {
+            match &statement.kind {
+                StatementKind::Declare { value, .. }
+                | StatementKind::Assign { value, .. }
+                | StatementKind::Return(value)
+                | StatementKind::PreferenceSet { value, .. }
+                | StatementKind::TextView { text: value, .. }
+                | StatementKind::Button { text: value, .. }
+                | StatementKind::EditText { hint: value, .. }
+                | StatementKind::TextInput { hint: value, .. }
+                | StatementKind::CheckBox { text: value, .. }
+                | StatementKind::Switch { text: value, .. }
+                | StatementKind::Toolbar { title: value, .. }
+                | StatementKind::SetText { text: value, .. }
+                | StatementKind::SetEnabled { enabled: value, .. }
+                | StatementKind::SetContentDescription { text: value, .. }
+                | StatementKind::ShowMenu { item: value, .. } => expression(value, strings, colors),
+                StatementKind::ListView {
+                    items: CollectionItems::Inline(values),
+                    ..
+                }
+                | StatementKind::Spinner {
+                    items: CollectionItems::Inline(values),
+                    ..
+                } => {
+                    for value in values {
+                        expression(value, strings, colors);
+                    }
+                }
+                StatementKind::ImageView {
+                    source: ImageSource::Resource { name, .. },
+                    ..
+                } => {
+                    images.insert(name.clone());
+                }
+                StatementKind::SetTextResourceColor { name, .. }
+                | StatementKind::SetBackgroundResourceColor { name, .. } => {
+                    colors.insert(name.clone());
+                }
+                StatementKind::StartActivity { extras, .. } => {
+                    for (_, value) in extras {
+                        expression(value, strings, colors);
+                    }
+                }
+                StatementKind::ShowDialog { title, message } => {
+                    expression(title, strings, colors);
+                    expression(message, strings, colors);
+                }
+                StatementKind::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    expression(condition, strings, colors);
+                    statements(then_body, strings, colors, images);
+                    statements(else_body, strings, colors, images);
+                }
+                StatementKind::For {
+                    start, end, body, ..
+                } => {
+                    expression(start, strings, colors);
+                    expression(end, strings, colors);
+                    statements(body, strings, colors, images);
+                }
+                StatementKind::DatabaseUpdate { id, values, .. } => {
+                    expression(id, strings, colors);
+                    for (_, value) in values {
+                        expression(value, strings, colors);
+                    }
+                }
+                StatementKind::DatabaseDelete { id, .. } => expression(id, strings, colors),
+                _ => {}
+            }
+        }
+    }
+    let mut strings = BTreeSet::new();
+    let mut colors = BTreeSet::new();
+    let mut images = BTreeSet::new();
+    for function in &program.functions {
+        statements(&function.body, &mut strings, &mut colors, &mut images);
+    }
+    for activity in &program.activities {
+        for state in &activity.state {
+            expression(&state.initial, &mut strings, &mut colors);
+        }
+        for collection in &activity.string_collections {
+            for item in &collection.items {
+                expression(item, &mut strings, &mut colors);
+            }
+        }
+        statements(&activity.on_create, &mut strings, &mut colors, &mut images);
+        for handler in &activity.on_click {
+            statements(&handler.body, &mut strings, &mut colors, &mut images);
+        }
+        for handler in &activity.on_select {
+            statements(&handler.body, &mut strings, &mut colors, &mut images);
+        }
+    }
+    if let Some(theme) = &program.app_theme {
+        colors.insert(theme.primary.name.clone());
+        colors.insert(theme.accent.name.clone());
+    }
+    if let Some(icon) = &program.launcher_icon {
+        images.insert(icon.name.clone());
+    }
+    for resource in &program.string_resources {
+        if !strings.contains(&resource.name) {
+            return Err(Diagnostic::at(
+                "AIC1466",
+                resource.span,
+                format!("unused string resource `{}`", resource.name),
+            ));
+        }
+    }
+    for resource in &program.color_resources {
+        if !colors.contains(&resource.name) {
+            return Err(Diagnostic::at(
+                "AIC1467",
+                resource.span,
+                format!("unused color resource `{}`", resource.name),
+            ));
+        }
+    }
+    for resource in &program.image_resources {
+        if !images.contains(&resource.name) {
+            return Err(Diagnostic::at(
+                "AIC1468",
+                resource.span,
+                format!("unused image resource `{}`", resource.name),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_navigation(
@@ -2196,6 +2926,145 @@ fn verify_one(s: SyntaxProgram, enforce_unused_capabilities: bool) -> Result<Pro
             "AIC1101",
             format!("invalid Android package `{}`", s.package),
         ));
+    }
+    let mut resource_variants = BTreeSet::new();
+    let mut resource_defaults = BTreeSet::new();
+    let mut resource_names = BTreeSet::new();
+    for resource in &s.string_resources {
+        if s.version != "0.2" {
+            return Err(Diagnostic::at(
+                "AIC1443",
+                resource.span,
+                "resources require AIC IR 0.2",
+            ));
+        }
+        if resource.name.len() > 80
+            || !resource.name.starts_with(|c: char| c.is_ascii_lowercase())
+            || !resource
+                .name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        {
+            return Err(Diagnostic::at(
+                "AIC1444",
+                resource.span,
+                format!("invalid string resource name `{}`", resource.name),
+            ));
+        }
+        if resource.value.is_empty() || resource.value.chars().count() > 4096 {
+            return Err(Diagnostic::at(
+                "AIC1445",
+                resource.span,
+                "string resource values require 1 to 4096 Unicode scalar values",
+            ));
+        }
+        if let Some(locale) = &resource.locale {
+            if !valid_canonical_locale(locale) {
+                return Err(Diagnostic::at(
+                    "AIC1446",
+                    resource.span,
+                    format!("invalid canonical BCP-47 locale `{locale}`"),
+                ));
+            }
+        } else {
+            resource_defaults.insert(resource.name.clone());
+        }
+        if !resource_variants.insert((resource.name.clone(), resource.locale.clone())) {
+            return Err(Diagnostic::at(
+                "AIC1447",
+                resource.span,
+                "duplicate string resource locale variant",
+            ));
+        }
+        resource_names.insert(resource.name.clone());
+    }
+    if let Some(name) = resource_names.difference(&resource_defaults).next() {
+        let span = s
+            .string_resources
+            .iter()
+            .find(|resource| &resource.name == name)
+            .map_or(s.string_resources[0].span, |resource| resource.span);
+        return Err(Diagnostic::at(
+            "AIC1448",
+            span,
+            format!("localized string resource `{name}` requires a default value"),
+        ));
+    }
+    let valid_resource_name = |name: &str| {
+        name.len() <= 80
+            && name.starts_with(|c: char| c.is_ascii_lowercase())
+            && name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    };
+    let mut colors = BTreeSet::new();
+    for color in &s.color_resources {
+        if s.version != "0.2" || !valid_resource_name(&color.name) || !valid_color(&color.value) {
+            return Err(Diagnostic::at(
+                "AIC1452",
+                color.span,
+                "color resources require IR 0.2, a lower_snake_case name, and #RRGGBB or #AARRGGBB",
+            ));
+        }
+        if !colors.insert(color.name.clone()) {
+            return Err(Diagnostic::at(
+                "AIC1453",
+                color.span,
+                "duplicate color resource",
+            ));
+        }
+    }
+    let mut images = BTreeSet::new();
+    let mut assets = BTreeSet::new();
+    for image in &s.image_resources {
+        let valid_asset = image.project_asset.len() <= 67
+            && image
+                .project_asset
+                .rsplit_once('.')
+                .is_some_and(|(stem, extension)| {
+                    valid_resource_name(stem) && matches!(extension, "png" | "webp")
+                });
+        if s.version != "0.2" || !valid_resource_name(&image.name) || !valid_asset {
+            return Err(Diagnostic::at(
+                "AIC1454",
+                image.span,
+                "project images require IR 0.2, canonical names, and a PNG or WebP asset filename",
+            ));
+        }
+        if !images.insert(image.name.clone()) || !assets.insert(image.project_asset.clone()) {
+            return Err(Diagnostic::at(
+                "AIC1455",
+                image.span,
+                "duplicate image resource or project asset",
+            ));
+        }
+    }
+    if let Some(theme) = &s.app_theme {
+        if s.version != "0.2" || theme.name != "app" {
+            return Err(Diagnostic::at(
+                "AIC1456",
+                theme.span,
+                "the bounded IR 0.2 theme must be named `app`",
+            ));
+        }
+        for reference in [&theme.primary, &theme.accent] {
+            if !colors.contains(&reference.name) {
+                return Err(Diagnostic::at(
+                    "AIC1457",
+                    reference.span,
+                    format!("unknown theme color `{}`", reference.name),
+                ));
+            }
+        }
+    }
+    if let Some(icon) = &s.launcher_icon {
+        if !images.contains(&icon.name) {
+            return Err(Diagnostic::at(
+                "AIC1458",
+                icon.span,
+                format!("unknown launcher image `{}`", icon.name),
+            ));
+        }
     }
     let content_views = s
         .activity
@@ -2533,6 +3402,10 @@ fn verify_one(s: SyntaxProgram, enforce_unused_capabilities: bool) -> Result<Pro
             used_capabilities: BTreeSet::new(),
             string_collections: BTreeSet::new(),
             strict_ui_semantics: s.version == "0.2",
+            string_resources: resource_defaults.clone(),
+            color_resources: colors.clone(),
+            image_resources: images.clone(),
+            allow_resource_runtime: false,
         };
         let mut env = BTreeMap::new();
         for p in &f.params {
@@ -2577,6 +3450,10 @@ fn verify_one(s: SyntaxProgram, enforce_unused_capabilities: bool) -> Result<Pro
             .map(|x| x.name.clone())
             .collect(),
         strict_ui_semantics: s.version == "0.2",
+        string_resources: resource_defaults.clone(),
+        color_resources: colors.clone(),
+        image_resources: images.clone(),
+        allow_resource_runtime: true,
     };
     let mut activity_env = BTreeMap::new();
     for state in &s.activity.state {
@@ -2740,6 +3617,7 @@ fn verify_one(s: SyntaxProgram, enforce_unused_capabilities: bool) -> Result<Pro
         state: s.activity.state,
         string_collections: s.activity.string_collections,
         on_create: s.activity.on_create,
+        on_create_variants: s.activity.on_create_variants,
         on_click: s.activity.on_click,
         on_select: s.activity.on_select,
     };
@@ -2747,6 +3625,11 @@ fn verify_one(s: SyntaxProgram, enforce_unused_capabilities: bool) -> Result<Pro
         version: s.version,
         label: s.label,
         package: s.package,
+        string_resources: s.string_resources,
+        color_resources: s.color_resources,
+        image_resources: s.image_resources,
+        app_theme: s.app_theme,
+        launcher_icon: s.launcher_icon,
         capabilities: declared_capabilities,
         preferences: s.preferences,
         database: s.database,
@@ -2764,6 +3647,37 @@ fn verify_one(s: SyntaxProgram, enforce_unused_capabilities: bool) -> Result<Pro
         activity: activity.clone(),
         activities: vec![activity],
     })
+}
+
+fn valid_canonical_locale(locale: &str) -> bool {
+    let parts: Vec<_> = locale.split('-').collect();
+    if parts.is_empty()
+        || !(2..=3).contains(&parts[0].len())
+        || !parts[0].chars().all(|c| c.is_ascii_lowercase())
+        || parts.len() > 3
+    {
+        return false;
+    }
+    let mut script = false;
+    let mut region = false;
+    for part in parts.iter().skip(1) {
+        if !script
+            && !region
+            && part.len() == 4
+            && part.starts_with(|c: char| c.is_ascii_uppercase())
+            && part[1..].chars().all(|c| c.is_ascii_lowercase())
+        {
+            script = true;
+        } else if !region
+            && ((part.len() == 2 && part.chars().all(|c| c.is_ascii_uppercase()))
+                || (part.len() == 3 && part.chars().all(|c| c.is_ascii_digit())))
+        {
+            region = true;
+        } else {
+            return false;
+        }
+    }
+    true
 }
 impl Check {
     fn stmts(
@@ -2960,6 +3874,19 @@ impl Check {
                     let a = self.expr(title, e)?;
                     req(Type::String, a, title.span)?;
                 }
+                if let StatementKind::ImageView {
+                    source: ImageSource::Resource { name, .. },
+                    ..
+                } = &s.kind
+                {
+                    if !self.image_resources.contains(name) {
+                        return Err(Diagnostic::at(
+                            "AIC1461",
+                            s.span,
+                            format!("unknown image resource `{name}`"),
+                        ));
+                    }
+                }
                 if let StatementKind::ListView { items, .. } = &s.kind {
                     match items {
                         CollectionItems::Inline(items) => {
@@ -3020,13 +3947,24 @@ impl Check {
             StatementKind::SetContentView { view: v }
             | StatementKind::SetLayout { view: v, .. }
             | StatementKind::SetBackgroundColor { view: v, .. }
+            | StatementKind::SetBackgroundResourceColor { view: v, .. }
             | StatementKind::SetPadding { view: v, .. }
             | StatementKind::SetVisibility { view: v, .. }
             | StatementKind::SetGravity { view: v, .. } => {
                 view(e, v, s.span)?;
+                if let StatementKind::SetBackgroundResourceColor { name, .. } = &s.kind {
+                    if !self.color_resources.contains(name) {
+                        return Err(Diagnostic::at(
+                            "AIC1463",
+                            s.span,
+                            format!("unknown color resource `{name}`"),
+                        ));
+                    }
+                }
                 Ok(false)
             }
-            StatementKind::SetTextColor { view: v, .. } => {
+            StatementKind::SetTextColor { view: v, .. }
+            | StatementKind::SetTextResourceColor { view: v, .. } => {
                 let binding = e.get(v).ok_or_else(|| {
                     Diagnostic::at("AIC1105", s.span, format!("unknown view id `{v}`"))
                 })?;
@@ -3041,6 +3979,15 @@ impl Check {
                         s.span,
                         "text color target must be a text_view, button, edit_text, text_input, check_box, or switch",
                     ));
+                }
+                if let StatementKind::SetTextResourceColor { name, .. } = &s.kind {
+                    if !self.color_resources.contains(name) {
+                        return Err(Diagnostic::at(
+                            "AIC1463",
+                            s.span,
+                            format!("unknown color resource `{name}`"),
+                        ));
+                    }
                 }
                 Ok(false)
             }
@@ -3315,6 +4262,42 @@ impl Check {
                 view(e, name, x.span)?;
                 Ok(Type::String)
             }
+            ExpressionKind::ResourceString { name, .. } => {
+                if !self.allow_resource_runtime {
+                    return Err(Diagnostic::at(
+                        "AIC1465",
+                        x.span,
+                        "runtime resources are not available inside user functions",
+                    ));
+                }
+                if self.string_resources.contains(name) {
+                    Ok(Type::String)
+                } else {
+                    Err(Diagnostic::at(
+                        "AIC1462",
+                        x.span,
+                        format!("unknown string resource `{name}`"),
+                    ))
+                }
+            }
+            ExpressionKind::ResourceColor { name, .. } => {
+                if !self.allow_resource_runtime {
+                    return Err(Diagnostic::at(
+                        "AIC1465",
+                        x.span,
+                        "runtime resources are not available inside user functions",
+                    ));
+                }
+                if self.color_resources.contains(name) {
+                    Ok(Type::I32)
+                } else {
+                    Err(Diagnostic::at(
+                        "AIC1463",
+                        x.span,
+                        format!("unknown color resource `{name}`"),
+                    ))
+                }
+            }
             ExpressionKind::PreferenceGet { key } => {
                 if self.ret.is_some() {
                     return Err(Diagnostic::at(
@@ -3560,6 +4543,21 @@ fn eval(x: &Expression, e: &BTreeMap<String, Value>, p: &Program) -> Result<Valu
             run(&f.body, &mut q, p)?
                 .ok_or_else(|| Diagnostic::at("AIC1104", f.span, "missing return"))
         }
+        ExpressionKind::ResourceString { name, .. } => p
+            .string_resources
+            .iter()
+            .find(|resource| resource.name == *name && resource.locale.is_none())
+            .map(|resource| Value::String(resource.value.clone()))
+            .ok_or_else(|| Diagnostic::at("AIC1462", x.span, "unknown string resource")),
+        ExpressionKind::ResourceColor { name, .. } => p
+            .color_resources
+            .iter()
+            .find(|resource| resource.name == *name)
+            .and_then(|resource| {
+                u32::from_str_radix(resource.value.trim_start_matches('#'), 16).ok()
+            })
+            .map(|value| Value::I32(value.cast_signed()))
+            .ok_or_else(|| Diagnostic::at("AIC1463", x.span, "unknown color resource")),
         ExpressionKind::AndroidText { .. }
         | ExpressionKind::PreferenceGet { .. }
         | ExpressionKind::DatabaseInsert { .. }
@@ -4187,6 +5185,115 @@ mod tests {
         assert!(parse_program(&legacy).is_ok());
     }
     #[test]
+    fn m9_canonical_string_resources_verify() {
+        let source = r#"aic_version 0.2 app "Localized" package "dev.aic.localized" {
+            resources {
+                string greeting = "Hello"
+                string greeting locale "zh-Hant-TW" = "你好"
+                string greeting locale "es-419" = "Hola"
+                string action_save = "Save"
+            }
+            activity MainActivity { on_create {
+                let text = android.text_view(text: resource.string(greeting) + resource.string(action_save))
+                android.set_content_view(text)
+            } }
+        }"#;
+        let program = parse_program(source).unwrap();
+        assert_eq!(program.string_resources.len(), 4);
+        assert!(program.string_resources.iter().any(|resource| {
+            resource.name == "greeting" && resource.locale.as_deref() == Some("zh-Hant-TW")
+        }));
+        assert_eq!(program.string_resources[0].name, "action_save");
+        assert_eq!(program, parse_program(source).unwrap());
+
+        for (changed, code) in [
+            (
+                source.replace("string greeting = \"Hello\"", "string Greeting = \"Hello\""),
+                "AIC1444",
+            ),
+            (
+                source.replace("string greeting = \"Hello\"", "string greeting = \"\""),
+                "AIC1445",
+            ),
+            (source.replace("zh-Hant-TW", "zh-hant-tw"), "AIC1446"),
+            (
+                source.replace(
+                    "string action_save = \"Save\"",
+                    "string greeting = \"Again\"",
+                ),
+                "AIC1447",
+            ),
+            (source.replace("string greeting = \"Hello\"", ""), "AIC1448"),
+        ] {
+            let error = parse_program(&changed).unwrap_err();
+            assert_eq!(error.code, code);
+            assert!(error.location.is_some());
+        }
+        assert_eq!(
+            parse_program(&source.replace("aic_version 0.2", "aic_version 0.1"))
+                .unwrap_err()
+                .code,
+            "AIC1443"
+        );
+    }
+    #[test]
+    fn m9_typed_resource_surface_and_invalid_fixtures() {
+        let program = parse_program(include_str!("../../../testdata/m9-resources.aic")).unwrap();
+        assert_eq!(program.color_resources.len(), 2);
+        assert_eq!(program.app_theme.as_ref().unwrap().name, "app");
+        assert!(matches!(
+            program.activity.on_create[0].kind,
+            StatementKind::TextView {
+                text: Expression {
+                    kind: ExpressionKind::ResourceString {
+                        id: 0x7f01_0000,
+                        ..
+                    },
+                    ..
+                },
+                ..
+            }
+        ));
+        for (fixture, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-resource-missing-string.aic"),
+                "AIC1462",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-resource-invalid-asset.aic"),
+                "AIC1454",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-resource-theme-color.aic"),
+                "AIC1457",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-resource-unused.aic"),
+                "AIC1466",
+            ),
+        ] {
+            assert_eq!(parse_program(fixture).unwrap_err().code, code);
+        }
+    }
+    #[test]
+    fn m9_supported_resource_catalog_has_complete_evidence_inventory() {
+        let catalog = capability_catalog();
+        let evidence = include_str!("../../../schema/m9-resource-capability-evidence.tsv");
+        for capability in [
+            "resources.localization",
+            "resources.images",
+            "resources.color_theme_icon",
+        ] {
+            assert!(catalog.contains(&format!("\"{capability}\"")));
+            let row = evidence
+                .lines()
+                .find(|line| line.starts_with(&format!("{capability}\t")))
+                .unwrap();
+            assert_eq!(row.split('\t').count(), 7);
+            assert!(row.split('\t').all(|field| !field.trim().is_empty()));
+        }
+    }
+    #[test]
     fn m2() {
         assert_eq!(
             evaluate_text(&parse_program(M2).unwrap()).unwrap(),
@@ -4321,5 +5428,49 @@ mod tests {
             "preference.set(last_note_id, title_text)",
         );
         assert_eq!(parse_program(&mismatch).unwrap_err().code, "AIC1116");
+    }
+
+    #[test]
+    fn m9_adaptive_variants_verify() {
+        let source = include_str!("../../../testdata/m9-adaptive-lifecycle.aic");
+        let program = parse_program(source).unwrap();
+        assert_eq!(program.activity.on_create_variants.len(), 4);
+        assert!(program.capabilities.contains(&Capability::Adaptive));
+        assert!(program.capabilities.contains(&Capability::StateRestoration));
+        let missing = source.replacen(
+            "    on_create for landscape expanded {",
+            "    ignored_create for landscape expanded {",
+            1,
+        );
+        assert!(parse_program(&missing).is_err());
+        let duplicate = source.replace(
+            "on_create for landscape expanded",
+            "on_create for landscape compact",
+        );
+        assert_eq!(parse_program(&duplicate).unwrap_err().code, "AIC1470");
+        let undeclared = source.replace("  capability ui.adaptive\n", "");
+        assert_eq!(parse_program(&undeclared).unwrap_err().code, "AIC1468");
+        let mismatched = source.replacen(
+            "let choice = android.spinner(items: choices)",
+            "let choice = android.list_view(items: choices)",
+            1,
+        );
+        assert_eq!(parse_program(&mismatched).unwrap_err().code, "AIC1472");
+        for (fixture, code) in [
+            (
+                include_str!("../../../testdata/invalid/m9-adaptive-missing-capability.aic"),
+                "AIC1468",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-adaptive-incomplete.aic"),
+                "AIC1471",
+            ),
+            (
+                include_str!("../../../testdata/invalid/m9-adaptive-view-mismatch.aic"),
+                "AIC1472",
+            ),
+        ] {
+            assert_eq!(parse_program(fixture).unwrap_err().code, code);
+        }
     }
 }

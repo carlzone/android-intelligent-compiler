@@ -1,0 +1,6 @@
+aic_version 0.2 app "Invalid" package "dev.aic.invalid" { activity MainActivity {
+on_create for portrait compact { let root = android.linear_layout(orientation: vertical) android.set_content_view(root) }
+on_create for portrait expanded { let root = android.linear_layout(orientation: vertical) android.set_content_view(root) }
+on_create for landscape compact { let root = android.linear_layout(orientation: horizontal) android.set_content_view(root) }
+on_create for landscape expanded { let root = android.linear_layout(orientation: horizontal) android.set_content_view(root) }
+} }
